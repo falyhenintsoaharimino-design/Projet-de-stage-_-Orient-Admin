@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tableau de bord - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="agent" data-page="tableau-de-bord" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Tableau de bord du service</h1>
+          <p class="text-muted">Service de légalisation et certification</p>
+        </div>
+      </header><div class="grid grid--3">
+        <div class="kpi">
+          <p class="kpi__label">Rendez-vous aujourd'hui</p>
+          <p class="kpi__value">8</p>
+        </div>
+        <div class="kpi kpi--warning">
+          <p class="kpi__label">Nouvelles demandes</p>
+          <p class="kpi__value">3</p>
+        </div>
+        <div class="kpi kpi--success">
+          <p class="kpi__label">Taux de bonne orientation</p>
+          <p class="kpi__value">91 %</p>
+        </div>
+      </div><div class="mt-5">
+        <div class="card">
+          <h3>Rendez-vous du jour</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Heure</th>
+                  <th>Citoyen</th>
+                  <th>Objet</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>09:00</td>
+                  <td>HARIMINO Faly</td>
+                  <td>Légalisation diplôme</td>
+                  <td><span class="badge badge--success">Confirmé</span></td>
+                </tr>
+                <tr>
+                  <td>09:30</td>
+                  <td>RAKOTO Nirina</td>
+                  <td>Légalisation acte</td>
+                  <td><span class="badge badge--success">Confirmé</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

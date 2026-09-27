@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prendre rendez-vous - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="citoyen" data-page="prendre-rendez-vous" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Prendre rendez-vous</h1>
+          <p class="text-muted">Service de légalisation et certification</p>
+        </div>
+      </header><div class="grid grid--main-aside">
+        <div class="card">
+          <h3>Choisissez une date - Septembre 2026</h3>
+          <div class="calendar">
+            <div class="calendar__weekday">Lun</div>
+            <div class="calendar__weekday">Mar</div>
+            <div class="calendar__weekday">Mer</div>
+            <div class="calendar__weekday">Jeu</div>
+            <div class="calendar__weekday">Ven</div>
+            <div class="calendar__weekday">Sam</div>
+            <div class="calendar__weekday">Dim</div>
+            <span class="cal-empty"></span>
+            <button class="cal-day is-disabled" type="button" disabled>1</button>
+            <button class="cal-day is-disabled" type="button" disabled>2</button>
+            <button class="cal-day is-disabled" type="button" disabled>3</button>
+            <button class="cal-day is-disabled" type="button" disabled>4</button>
+            <button class="cal-day is-disabled" type="button" disabled>5</button>
+            <button class="cal-day is-disabled" type="button" disabled>6</button>
+            <button class="cal-day is-disabled" type="button" disabled>7</button>
+            <button class="cal-day is-disabled" type="button" disabled>8</button>
+            <button class="cal-day is-disabled" type="button" disabled>9</button>
+            <button class="cal-day is-disabled" type="button" disabled>10</button>
+            <button class="cal-day is-disabled" type="button" disabled>11</button>
+            <button class="cal-day is-disabled" type="button" disabled>12</button>
+            <button class="cal-day is-disabled" type="button" disabled>13</button>
+            <button class="cal-day is-disabled" type="button" disabled>14</button>
+            <button class="cal-day is-disabled" type="button" disabled>15</button>
+            <button class="cal-day is-disabled" type="button" disabled>16</button>
+            <button class="cal-day is-disabled" type="button" disabled>17</button>
+            <button class="cal-day is-disabled" type="button" disabled>18</button>
+            <button class="cal-day is-disabled" type="button" disabled>19</button>
+            <button class="cal-day is-disabled" type="button" disabled>20</button>
+            <button class="cal-day is-disabled" type="button" disabled>21</button>
+            <button class="cal-day is-disabled" type="button" disabled>22</button>
+            <button class="cal-day" type="button" data-label="Mercredi 23 septembre" data-output="#recap-date">23</button>
+            <button class="cal-day is-selected" type="button" data-label="Jeudi 24 septembre" data-output="#recap-date">24</button>
+            <button class="cal-day" type="button" data-label="Vendredi 25 septembre" data-output="#recap-date">25</button>
+            <button class="cal-day is-disabled" type="button" disabled>26</button>
+            <button class="cal-day is-disabled" type="button" disabled>27</button>
+            <button class="cal-day" type="button" data-label="Lundi 28 septembre" data-output="#recap-date">28</button>
+            <button class="cal-day" type="button" data-label="Mardi 29 septembre" data-output="#recap-date">29</button>
+            <button class="cal-day" type="button" data-label="Mercredi 30 septembre" data-output="#recap-date">30</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Jeudi 24 septembre</h3>
+          <p class="text-muted">Créneaux disponibles</p>
+          <div class="slots">
+            <button class="slot" type="button" data-label="08:00" data-output="#recap-heure">08:00</button>
+            <button class="slot" type="button" data-label="08:30" data-output="#recap-heure">08:30</button>
+            <button class="slot is-selected" type="button" data-label="09:00" data-output="#recap-heure">09:00</button>
+            <button class="slot" type="button" data-label="09:30" data-output="#recap-heure">09:30</button>
+            <button class="slot" type="button" data-label="10:00" data-output="#recap-heure">10:00</button>
+            <button class="slot" type="button" data-label="10:30" data-output="#recap-heure">10:30</button>
+            <button class="slot" type="button" data-label="11:00" data-output="#recap-heure">11:00</button>
+            <button class="slot" type="button" data-label="13:00" data-output="#recap-heure">13:00</button>
+          </div>
+          <h3 class="mt-5">Récapitulatif</h3>
+          <p class="text-muted">Légalisation - <span id="recap-date">Jeudi 24 septembre</span> à <span id="recap-heure">09:00</span></p>
+          <p class="text-small text-muted">Rappel envoyé par e-mail la veille.</p>
+          <div class="card__footer"><button class="btn btn--success" type="button">Confirmer le rendez-vous</button></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

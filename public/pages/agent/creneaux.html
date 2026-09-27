@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Créneaux - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="agent" data-page="creneaux" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Créneaux et disponibilités</h1>
+        </div>
+        <div class="page-head__actions"><button class="btn btn--outline" type="button">Bloquer une plage</button></div>
+      </header><div class="card">
+        <h3>Paramètres du service</h3>
+        <div class="form-row">
+          <div class="field">
+            <label for="duree">Durée d'un créneau</label>
+            <select id="duree" name="duree">
+              <option value="15 minutes">15 minutes</option>
+              <option value="30 minutes" selected>30 minutes</option>
+              <option value="45 minutes">45 minutes</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="capacite">Capacité par créneau</label>
+            <select id="capacite" name="capacite">
+              <option value="1 citoyen">1 citoyen</option>
+              <option value="2 citoyens">2 citoyens</option>
+              <option value="3 citoyens">3 citoyens</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label for="fermeture">Jours de fermeture exceptionnelle</label><input type="date" id="fermeture" name="fermeture"></div>
+        <button class="btn btn--primary" type="button">Enregistrer</button>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

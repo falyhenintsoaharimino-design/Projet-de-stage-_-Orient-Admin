@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Donner mon avis - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="citoyen" data-page="donner-avis" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Donner mon avis</h1>
+          <p class="text-muted">Rendez-vous du 24/09 - Service de légalisation</p>
+        </div>
+      </header><div class="card">
+        <form>
+          <div class="field">
+            <label>Votre note</label>
+            <div class="stars">
+              <input type="radio" name="note" id="n1" value="1">
+              <label for="n1">1</label>
+              <input type="radio" name="note" id="n2" value="2">
+              <label for="n2">2</label>
+              <input type="radio" name="note" id="n3" value="3">
+              <label for="n3">3</label>
+              <input type="radio" name="note" id="n4" value="4">
+              <label for="n4">4</label>
+              <input type="radio" name="note" id="n5" value="5">
+              <label for="n5">5</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="commentaire">Commentaire</label>
+            <textarea id="commentaire" name="commentaire" placeholder="Votre expérience..."></textarea>
+          </div>
+          <button class="btn btn--primary" type="button">Envoyer mon avis</button>
+        </form>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

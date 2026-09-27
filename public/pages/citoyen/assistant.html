@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assistant - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="citoyen" data-page="assistant" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Assistant d'orientation</h1>
+        </div>
+      </header><div class="assistant-layout">
+        <div class="card chat">
+          <div class="chat__messages" id="chat-messages" aria-live="polite">
+            <div class="bubble bubble--bot">
+              <p>Bonjour Faly ! Décrivez ce que vous souhaitez faire.</p>
+            </div>
+          </div>
+          <form class="chat__form" id="chat-form">
+            <input type="text" id="chat-input" placeholder="Décrivez votre besoin..." autocomplete="off" aria-label="Votre message">
+            <button class="btn btn--primary" type="submit">Envoyer</button>
+          </form>
+        </div>
+        <aside>
+          <div class="card">
+            <h3>Historique récent</h3>
+            <ul class="check-list">
+              <li>Légalisation de diplôme - orienté</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+  <script src="../../assets/js/pages/assistant.js"></script>
+</body>
+</html>

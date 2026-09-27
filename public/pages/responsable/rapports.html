@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rapports - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="responsable" data-page="rapports" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Rapports</h1>
+        </div>
+      </header><div class="card">
+        <div class="form-row">
+          <div class="field">
+            <label for="periode">Période</label>
+            <select id="periode" name="periode">
+              <option value="30 derniers jours">30 derniers jours</option>
+              <option value="Ce mois-ci">Ce mois-ci</option>
+              <option value="Personnalisée">Personnalisée</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="format">Format</label>
+            <select id="format" name="format">
+              <option value="PDF">PDF</option>
+              <option value="Excel">Excel</option>
+              <option value="CSV">CSV</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn--primary" type="button">Générer le rapport</button>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

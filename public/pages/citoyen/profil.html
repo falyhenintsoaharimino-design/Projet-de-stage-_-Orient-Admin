@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profil - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="citoyen" data-page="profil" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Profil et préférences</h1>
+        </div>
+      </header><div class="grid grid--main-aside">
+        <div class="card">
+          <h3>Informations personnelles</h3>
+          <div class="field"><label for="nom">Nom complet</label><input type="text" id="nom" name="nom" value="HARIMINO Faly Henintsoa"></div>
+          <div class="field"><label for="email">E-mail</label><input type="email" id="email" name="email" value="faly@example.mg"></div>
+          <div class="field"><label for="tel">Téléphone</label><input type="tel" id="tel" name="tel"></div>
+          <div class="field">
+            <label for="langue">Langue</label>
+            <select id="langue" name="langue">
+              <option value="Français">Français</option>
+              <option value="Malagasy">Malagasy</option>
+            </select>
+          </div>
+          <button class="btn btn--primary" type="button">Enregistrer</button>
+        </div>
+        <div class="card">
+          <h3>Sécurité</h3>
+          <div class="field"><label for="mdp">Nouveau mot de passe</label><input type="password" id="mdp" name="mdp"></div>
+          <button class="btn btn--outline" type="button">Changer le mot de passe</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

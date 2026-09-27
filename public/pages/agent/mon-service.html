@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fiche du service - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="agent" data-page="mon-service" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Fiche du service</h1>
+        </div>
+      </header><div class="card">
+        <div class="field">
+          <label for="nom">Nom du service</label>
+          <input type="text" id="nom" name="nom" value="Service de légalisation et certification">
+        </div>
+        <div class="field"><label for="adresse">Adresse</label><input type="text" id="adresse" name="adresse" value="Hôtel de ville, bureau 12"></div>
+        <div class="form-row">
+          <div class="field"><label for="horaires">Horaires</label><input type="text" id="horaires" name="horaires" value="Lun-Ven, 8h-15h"></div>
+          <div class="field"><label for="tel">Téléphone</label><input type="text" id="tel" name="tel"></div>
+        </div>
+        <div class="field">
+          <label for="missions">Missions</label>
+          <textarea id="missions" name="missions" placeholder="Décrire les missions du service..."></textarea>
+        </div>
+        <button class="btn btn--primary" type="button">Enregistrer</button>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

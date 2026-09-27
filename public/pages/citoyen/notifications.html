@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notifications - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="citoyen" data-page="notifications" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Notifications</h1>
+        </div>
+      </header><div class="card">
+        <div class="notif">
+          <div>
+            <p class="notif__title">Rendez-vous confirmé</p>
+            <p class="text-small text-muted">Votre rendez-vous du 24/09 à 09:00 est confirmé.</p>
+          </div>
+        </div>
+        <div class="notif">
+          <div>
+            <p class="notif__title">Rappel</p>
+            <p class="text-small text-muted">N'oubliez pas votre pièce d'identité pour le rendez-vous de demain.</p>
+          </div>
+        </div>
+        <div class="notif is-unread">
+          <div>
+            <p class="notif__title">Document manquant</p>
+            <p class="text-small text-muted">Il manque une pièce à votre dossier #D-1042.</p>
+          </div>
+          <span class="notif__date">●</span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

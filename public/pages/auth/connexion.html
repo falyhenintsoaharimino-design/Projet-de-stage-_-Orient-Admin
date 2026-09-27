@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="visiteur" data-page="connexion" data-root="../../">
+  <div id="site-header"></div>
+  <main id="contenu">
+    <div class="auth-shell">
+      <div class="auth-card">
+        <div class="card">
+          <div class="auth-card__head">
+            <img src="../../assets/img/logo-orient-admin-icon.png" alt="" width="40" height="51">
+            <h1>Connexion</h1>
+          </div>
+          <div class="alert alert--danger" id="auth-error" hidden></div>
+          <form id="form-connexion">
+            <div class="field"><label for="email">E-mail</label><input type="email" id="email" name="email" required></div>
+            <div class="field"><label for="mdp">Mot de passe</label><input type="password" id="mdp" name="mdp" required></div>
+            <p class="text-small"><a href="mot-de-passe-oublie.html">Mot de passe oublié ?</a></p>
+            <button class="btn btn--primary btn--block" type="submit">Se connecter</button>
+          </form>
+        </div>
+        <p class="auth-card__foot"><span>Pas encore de compte ? </span><a href="inscription.html">Créer un compte</a></p>
+      </div>
+    </div>
+  </main>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+  <script src="../../assets/js/pages/auth.js"></script>
+</body>
+</html>

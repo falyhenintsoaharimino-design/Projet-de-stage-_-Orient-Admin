@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vue d'ensemble - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="responsable" data-page="vue-ensemble" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Vue d'ensemble</h1>
+          <p class="text-muted">30 derniers jours</p>
+        </div>
+        <div class="page-head__actions"><button class="btn btn--primary" type="button">Exporter le rapport</button></div>
+      </header><div class="grid grid--4">
+        <div class="kpi">
+          <p class="kpi__label">Demandes reçues</p>
+          <p class="kpi__value">2 481</p>
+        </div>
+        <div class="kpi kpi--success">
+          <p class="kpi__label">Bien orientées</p>
+          <p class="kpi__value">91 %</p>
+        </div>
+        <div class="kpi">
+          <p class="kpi__label">Rendez-vous pris</p>
+          <p class="kpi__value">1 336</p>
+        </div>
+        <div class="kpi kpi--warning">
+          <p class="kpi__label">Satisfaction</p>
+          <p class="kpi__value">4,4 / 5</p>
+        </div>
+      </div><div class="grid grid--main-aside mt-5">
+        <div class="card">
+          <h3>Demandes par service</h3>
+          <div class="bars">
+            <div class="bars__item">
+              <div class="bars__bar" style="--value: 78%"></div>
+              <span class="bars__label">État civil</span>
+            </div>
+            <div class="bars__item">
+              <div class="bars__bar" style="--value: 55%"></div>
+              <span class="bars__label">Fiscalité</span>
+            </div>
+            <div class="bars__item">
+              <div class="bars__bar" style="--value: 40%"></div>
+              <span class="bars__label">Urbanisme</span>
+            </div>
+            <div class="bars__item">
+              <div class="bars__bar" style="--value: 62%"></div>
+              <span class="bars__label">Aff. sociales</span>
+            </div>
+            <div class="bars__item">
+              <div class="bars__bar" style="--value: 46%"></div>
+              <span class="bars__label">Légalisation</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Demandes mal comprises (à améliorer)</h3>
+          <ul class="check-list">
+            <li>« j'ai perdu mon livret » - corrigé en Affaires sociales</li>
+            <li>« papier pour terrain » - corrigé en Urbanisme</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

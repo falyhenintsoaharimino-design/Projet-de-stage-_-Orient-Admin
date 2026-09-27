@@ -1,0 +1,15 @@
+# Sert les fichiers du frontend (index.html, pages/, assets/, data/) tels
+# quels s'ils existent ; sinon, transmet la requête au routeur Symfony
+# (index.php), qui gère les routes /api/*. Utile pour un déploiement Apache ;
+# ignoré par le serveur local Symfony CLI (symfony serve), qui applique déjà
+# cette même logique automatiquement.
+DirectoryIndex index.html index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule .* - [L]
+
+    RewriteRule ^ index.php [L]
+</IfModule>

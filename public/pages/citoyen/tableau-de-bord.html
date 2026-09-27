@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tableau de bord - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="citoyen" data-page="tableau-de-bord" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Tableau de bord</h1>
+          <p class="text-muted" id="salutation"></p>
+        </div>
+      </header><div class="grid grid--3">
+        <div class="card">
+          <h3>Prochain rendez-vous</h3>
+          <p class="text-muted">La prise de rendez-vous n'est pas encore reliée au serveur.</p>
+          <div class="card__footer"><a href="mes-rendez-vous.html">Voir mes rendez-vous →</a></div>
+        </div>
+        <div class="card">
+          <h3>Demandes en cours</h3>
+          <p class="text-muted" id="resume-demandes">Chargement...</p>
+          <div class="card__footer"><a href="mes-demandes.html">Voir mes demandes →</a></div>
+        </div>
+        <div class="card">
+          <h3>Pièces manquantes</h3>
+          <div>
+            <p class="text-muted">Aucune alerte pour le moment.</p>
+          </div>
+        </div>
+      </div><div class="mt-5">
+        <div class="card">
+          <h3>Besoin d'une nouvelle démarche ?</h3>
+          <p class="text-muted">Décrivez votre besoin à l'assistant pour être orienté.</p>
+          <div class="card__footer"><a class="btn btn--primary" href="assistant.html">Ouvrir l'assistant</a></div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+  <script src="../../assets/js/pages/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accueil - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="./assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="./assets/css/main.css">
+</head>
+<body data-role="visiteur" data-page="accueil" data-root="./">
+  <div id="site-header"></div>
+  <main id="contenu">
+    <div class="hero hero--photo" style="background-image:url('assets/img/hero-assemblee-nationale.jpg');background-size:cover;background-position:center;background-repeat:no-repeat">
+      <div class="container hero__inner">
+        <img class="hero__mark" src="assets/img/logo-orient-admin-icon.png" alt="" width="56" height="72">
+        <h1 class="hero__title">Votre orientation administrative intelligente</h1>
+        <p class="hero__lead">Décrivez votre besoin, notre assistant vous oriente, vous indique les documents à fournir et vous propose un rendez-vous.</p>
+        <form class="search-bar hero__search" action="pages/public/assistant.html" method="get">
+          <input type="search" name="q" placeholder="Que souhaitez-vous faire ?" aria-label="Décrire mon besoin">
+          <button class="btn btn--primary" type="button">Rechercher</button>
+        </form>
+        <div class="hero__quick-actions">
+          <a class="quick-action" href="pages/public/assistant.html?q=acte+de+naissance"><span class="quick-action__icon quick-action__icon--info">🧾</span><span>Demande d'acte de naissance</span></a>
+          <a class="quick-action" href="pages/public/assistant.html?q=carte+d'identit%C3%A9"><span class="quick-action__icon quick-action__icon--info">🪪</span><span>Prendre rendez-vous CNI / Passeport</span></a>
+          <a class="quick-action" href="pages/public/assistant.html?q=impots"><span class="quick-action__icon quick-action__icon--danger">💰</span><span>Déclarer mes impôts</span></a>
+          <a class="quick-action" href="pages/public/assistant.html?q=urbanisme"><span class="quick-action__icon quick-action__icon--success">🏗️</span><span>Urbanisme et travaux</span></a>
+        </div>
+      </div>
+    </div><section class="section">
+      <div class="container">
+        <h2 class="section__title">Services populaires</h2>
+        <div class="grid grid--4 popular-services">
+          <a class="popular-service" href="pages/public/services.html"><span class="popular-service__icon">🧍</span><span>État civil</span></a>
+          <a class="popular-service" href="pages/public/services.html"><span class="popular-service__icon">💰</span><span>Fiscalité</span></a>
+          <a class="popular-service" href="pages/public/services.html"><span class="popular-service__icon">🤝</span><span>Affaires sociales</span></a>
+          <a class="popular-service" href="pages/public/services.html"><span class="popular-service__icon">🏢</span><span>Urbanisme</span></a>
+        </div>
+      </div>
+    </section><section class="section section--soft">
+      <div class="container">
+        <h2 class="section__title">Comment ça marche</h2>
+        <div class="grid grid--3">
+          <div class="step">
+            <div class="step__number">1</div>
+            <h3>Décrivez votre besoin</h3>
+            <p class="text-muted">Écrivez simplement ce que vous voulez faire.</p>
+          </div>
+          <div class="step">
+            <div class="step__number">2</div>
+            <h3>Soyez orienté</h3>
+            <p class="text-muted">Service compétent, procédure et pièces à fournir.</p>
+          </div>
+          <div class="step">
+            <div class="step__number">3</div>
+            <h3>Prenez rendez-vous</h3>
+            <p class="text-muted">Choisissez un créneau et recevez des rappels.</p>
+          </div>
+        </div>
+        <a class="mt-5" href="pages/public/comment-ca-marche.html">En savoir plus sur la démarche →</a>
+      </div>
+    </section>
+  </main>
+  <div id="site-footer"></div>
+  <script src="./assets/js/config/nav-config.js"></script>
+  <script src="./assets/js/api.js"></script>
+  <script src="./assets/js/components/layout.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

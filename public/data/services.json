@@ -1,0 +1,8 @@
+{
+  "_commentaire": "Exemple de données. Ce fichier n'est pas encore utilisé : il montre la forme des données que l'API renverra plus tard.",
+  "services": [
+    { "id": "etat-civil-naissance", "rubrique": "etat-civil", "nom": "Acte de naissance", "organisme": "Mairie du lieu de naissance" },
+    { "id": "identite-cin", "rubrique": "identite", "nom": "Carte nationale d'identité", "organisme": "Bureau compétent" },
+    { "id": "justice-casier", "rubrique": "justice", "nom": "Casier judiciaire (bulletin n°3)", "organisme": "Greffe du tribunal" }
+  ]
+}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catalogue des services - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="visiteur" data-page="services" data-root="../../">
+  <div id="site-header"></div>
+  <main id="contenu">
+    <header class="page-head">
+      <div>
+        <h1>Catalogue des services</h1>
+        <p class="text-muted">Parcourez les services par catégorie ou recherchez un mot-clé.</p>
+      </div>
+    </header><div class="field"><input type="search" placeholder="Rechercher un service..." aria-label="Rechercher"></div><div class="chips" data-filter-group="#liste-services">
+      <button class="chip is-active" type="button" data-filter="tous">Tous</button>
+      <button class="chip" type="button" data-filter="état civil">État civil</button>
+      <button class="chip" type="button" data-filter="citoyenneté">Citoyenneté</button>
+      <button class="chip" type="button" data-filter="fiscalité">Fiscalité</button>
+      <button class="chip" type="button" data-filter="foncier">Foncier</button>
+      <button class="chip" type="button" data-filter="justice">Justice</button>
+      <button class="chip" type="button" data-filter="transport">Transport</button>
+      <button class="chip" type="button" data-filter="entreprises">Entreprises</button>
+    </div><div class="mt-5">
+      <div class="grid grid--3" id="liste-services">
+        <div class="card" data-category="etat civil">
+          <div class="service-card__tag">Etat Civil</div>
+          <h3 class="service-card__title">Acte de naissance</h3>
+          <p class="service-card__text">Copie intégrale ou extrait, à la mairie du lieu de naissance.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="citoyenneté">
+          <div class="service-card__tag">Citoyenneté</div>
+          <h3 class="service-card__title">Carte nationale d'identité</h3>
+          <p class="service-card__text">Première demande, renouvellement ou duplicata.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="citoyenneté">
+          <div class="service-card__tag">Citoyenneté</div>
+          <h3 class="service-card__title">Certificat de résidence</h3>
+          <p class="service-card__text">Délivré par le fokontany.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="justice">
+          <div class="service-card__tag">Justice</div>
+          <h3 class="service-card__title">Casier judiciaire (bulletin n°3)</h3>
+          <p class="service-card__text">Demandé au greffe du tribunal.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="transport">
+          <div class="service-card__tag">Transport</div>
+          <h3 class="service-card__title">Permis de conduire</h3>
+          <p class="service-card__text">Première demande, renouvellement, duplicata.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="fiscalité">
+          <div class="service-card__tag">Fiscalité</div>
+          <h3 class="service-card__title">Numéro d'identification fiscale</h3>
+          <p class="service-card__text">Délivré par le centre fiscal compétent.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="entreprises">
+          <div class="service-card__tag">Entreprises</div>
+          <h3 class="service-card__title">Création d'entreprise</h3>
+          <p class="service-card__text">Entreprise individuelle ou société, via le guichet unique.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+        <div class="card" data-category="foncier">
+          <div class="service-card__tag">Foncier</div>
+          <h3 class="service-card__title">Titre foncier</h3>
+          <p class="service-card__text">Transformation d'un cadastre en titre, service foncier.</p>
+          <a href="service-detail.html">Voir la fiche →</a>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/api.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>

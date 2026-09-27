@@ -1,0 +1,12 @@
+POST http://127.0.0.1:8000/api/login_check
+Content-Type: application/json
+
+{
+  "email": "test@test.com",
+  "password": "motdepasse123"
+}
+
+###
+GET http://127.0.0.1:8000/api/services
+###
+GET http://127.0.0.1:8000/api/procedures

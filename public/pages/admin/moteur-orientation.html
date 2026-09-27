@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moteur d'orientation - Orient-Admin</title>
+  <link rel="icon" type="image/png" href="../../assets/img/logo-orient-admin-icon.png">
+  <link rel="stylesheet" href="../../assets/css/main.css">
+</head>
+<body data-role="admin" data-page="moteur-orientation" data-root="../../">
+  <div id="site-header"></div>
+  <div class="app-shell">
+    <aside id="site-sidebar"></aside>
+    <main id="contenu" class="app-shell__main">
+      <header class="page-head">
+        <div>
+          <h1>Moteur d'orientation</h1>
+        </div>
+        <div class="page-head__actions"><button class="btn btn--primary" type="button">Relancer l'entraînement</button></div>
+      </header><div class="grid grid--3">
+        <div class="kpi">
+          <p class="kpi__label">Précision (top 1)</p>
+          <p class="kpi__value">82 %</p>
+        </div>
+        <div class="kpi kpi--success">
+          <p class="kpi__label">Précision (top 3)</p>
+          <p class="kpi__value">95 %</p>
+        </div>
+        <div class="kpi kpi--warning">
+          <p class="kpi__label">Demandes non comprises</p>
+          <p class="kpi__value">6 %</p>
+        </div>
+      </div><div class="card">
+        <h3 class="mt-5">Demandes mal comprises récentes</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Texte</th>
+                <th>Service proposé</th>
+                <th>Service corrigé</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>j'ai perdu mon livret</td>
+                <td>État civil</td>
+                <td>Affaires sociales</td>
+              </tr>
+              <tr>
+                <td>papier pour terrain</td>
+                <td>Fiscalité</td>
+                <td>Urbanisme</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="site-footer"></div>
+  <script src="../../assets/js/config/nav-config.js"></script>
+  <script src="../../assets/js/components/layout.js"></script>
+  <script src="../../assets/js/main.js"></script>
+</body>
+</html>
