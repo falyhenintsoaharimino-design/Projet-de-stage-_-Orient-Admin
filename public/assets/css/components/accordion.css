@@ -1,0 +1,4 @@
+/* Questions/réponses avec <details> (aucun JavaScript nécessaire) */
+.accordion { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+.accordion summary { padding: var(--space-4); font-weight: 600; cursor: pointer; }
+.accordion__body { padding: 0 var(--space-4) var(--space-4); color: var(--color-text-muted); }

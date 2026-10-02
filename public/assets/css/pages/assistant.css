@@ -1,0 +1,4 @@
+/* Page assistant : conversation + panneau d'aide (flexbox, cohérent avec layout/shell.css) */
+.assistant-layout { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; }
+.assistant-layout > *:first-child { flex: 2 1 480px; }
+.assistant-layout > *:last-child { flex: 1 1 280px; }

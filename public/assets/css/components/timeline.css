@@ -1,0 +1,11 @@
+/* Chronologie d'une demande */
+.timeline { border-left: 2px solid var(--color-border); margin-left: var(--space-2); }
+.timeline__item { position: relative; padding: 0 0 var(--space-4) var(--space-5); }
+.timeline__item::before {
+  content: ""; position: absolute; left: -7px; top: 4px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--color-border);
+}
+.timeline__item.is-done::before { background: var(--color-success); }
+.timeline__item.is-current::before { background: var(--color-primary); }
+.timeline__title { font-weight: 600; }
+.timeline__date { font-size: 0.8rem; color: var(--color-text-muted); }

@@ -1,0 +1,35 @@
+/* Indicateurs et graphiques simples réalisés en CSS (à remplacer plus tard par une bibliothèque) */
+.kpi { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4) var(--space-5); }
+.kpi__label { font-size: 0.85rem; color: var(--color-text-muted); }
+.kpi__value { font-size: 1.9rem; font-weight: 700; color: var(--color-primary); line-height: 1.2; }
+.kpi--success .kpi__value { color: var(--color-success); }
+.kpi--warning .kpi__value { color: var(--color-warning); }
+.kpi__note { font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* Barres verticales : la hauteur vient de --value (ex. style="--value: 60%") */
+.bars { display: flex; align-items: flex-end; gap: var(--space-4); height: 220px; padding-top: var(--space-3); }
+.bars__item { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: var(--space-2); }
+.bars__bar { width: 100%; max-width: 56px; height: var(--value); background: var(--color-primary); border-radius: 8px 8px 0 0; }
+.bars__label { font-size: 0.78rem; color: var(--color-text-muted); text-align: center; }
+
+/* Barres horizontales de progression */
+.progress { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2); font-size: 0.9rem; }
+.progress > span:first-child { flex: 0 0 110px; }
+.progress > span:last-child { flex: 0 0 48px; text-align: right; }
+.progress__track { flex: 1; height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.progress__fill { height: 100%; width: var(--value); background: var(--color-primary); border-radius: 999px; }
+
+/* Carte de chaleur de l'affluence (jours x heures) : flexbox, une ligne par jour */
+.heatmap { display: flex; flex-wrap: wrap; gap: 4px; font-size: 0.8rem; }
+.heatmap__head, .heatmap__day, .heat {
+  flex: 1 1 calc(100% / 9 - 4px * 8 / 9);
+  max-width: calc(100% / 9 - 4px * 8 / 9);
+}
+.heatmap__head { text-align: center; color: var(--color-text-muted); font-weight: 600; }
+.heatmap__day { color: var(--color-text-muted); font-weight: 600; align-self: center; }
+.heat { height: 34px; border-radius: 6px; }
+.heat--1 { background: #dbeafe; }
+.heat--2 { background: #93c5fd; }
+.heat--3 { background: #3b82f6; }
+.heat--4 { background: #1d4ed8; }
+.heat--5 { background: #f59e0b; }

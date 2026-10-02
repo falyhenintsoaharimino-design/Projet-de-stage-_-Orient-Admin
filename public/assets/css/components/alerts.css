@@ -1,0 +1,6 @@
+/* Messages d'information */
+.alert { padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border-left: 4px solid; font-size: 0.925rem; }
+.alert--info { background: var(--color-primary-soft); border-color: var(--color-primary); }
+.alert--success { background: var(--color-success-soft); border-color: var(--color-success); }
+.alert--warning { background: var(--color-warning-soft); border-color: var(--color-warning); }
+.alert--danger { background: var(--color-danger-soft); border-color: var(--color-danger); }

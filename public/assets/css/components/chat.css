@@ -1,0 +1,36 @@
+/* Assistant conversationnel */
+.chat { display: flex; flex-direction: column; min-height: 460px; }
+.chat__messages { flex: 1; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-2) 0 var(--space-4); }
+.bubble { max-width: 82%; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); font-size: 0.95rem; }
+.bubble--bot { background: var(--color-primary-soft); align-self: flex-start; }
+.bubble--user { background: var(--color-primary); color: #fff; align-self: flex-end; }
+.chat__form { display: flex; gap: var(--space-2); border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
+.chat__form input { flex: 1; }
+
+.suggestions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.suggestions > * + * { margin-left: var(--space-2); }
+.suggestion {
+  border: 1px solid var(--color-border); background: var(--color-surface);
+  border-radius: 999px; padding: 6px 14px; font-size: 0.875rem;
+}
+.suggestion:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Carte de résultat d'orientation */
+.result-card { margin-top: var(--space-3); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text); }
+.result-card__title { font-weight: 600; }
+.result-card__actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; }
+
+/* Bouton flottant vers l'assistant, visible sur toutes les pages sauf l'assistant lui-même */
+.fab-assistant {
+  position: fixed; right: var(--space-5); bottom: var(--space-5); z-index: 60;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--color-success); color: #fff;
+  display: grid; place-items: center; font-size: 1.4rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.25);
+  transition: transform 0.15s ease;
+}
+.fab-assistant:hover { transform: scale(1.06); text-decoration: none; }
+
+@media (max-width: 640px) {
+  .fab-assistant { right: var(--space-4); bottom: var(--space-4); width: 50px; height: 50px; font-size: 1.25rem; }
+}

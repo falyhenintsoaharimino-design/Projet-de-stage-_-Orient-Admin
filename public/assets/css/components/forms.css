@@ -1,0 +1,33 @@
+/* Formulaires */
+.field { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-4); }
+.field label { font-weight: 600; font-size: 0.9rem; }
+.field__hint { font-size: 0.825rem; color: var(--color-text-muted); }
+
+input[type="text"], input[type="email"], input[type="tel"], input[type="password"],
+input[type="search"], input[type="date"], input[type="time"], input[type="number"],
+select, textarea {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+textarea { min-height: 110px; resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: 3px solid #bfdbfe; border-color: var(--color-primary); }
+
+.form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
+.checkbox { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.checkbox input { width: 18px; height: 18px; }
+
+/* Barre de recherche */
+.search-bar { display: flex; gap: var(--space-2); }
+.search-bar input { flex: 1; }
+
+/* Notation (boutons radio) */
+.stars { display: flex; gap: var(--space-2); }
+.stars label {
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  padding: 8px 14px; cursor: pointer; font-weight: 600;
+}
+.stars input { position: absolute; opacity: 0; }
+.stars input:checked + label { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }

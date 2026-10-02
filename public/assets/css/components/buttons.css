@@ -1,0 +1,18 @@
+/* Boutons : .btn + une variante (--primary, --outline, --success, --danger, --ghost) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  padding: 10px 18px; border-radius: var(--radius-sm);
+  border: 1px solid transparent; font-weight: 600; font-size: 0.95rem;
+  line-height: 1.2; cursor: pointer; text-decoration: none;
+}
+.btn:hover { text-decoration: none; }
+.btn--primary { background: var(--color-primary); color: #fff; }
+.btn--primary:hover { background: var(--color-primary-dark); }
+.btn--outline { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
+.btn--outline:hover { background: var(--color-primary-soft); }
+.btn--success { background: var(--color-success); color: #fff; }
+.btn--danger { background: var(--color-danger); color: #fff; }
+.btn--ghost { background: transparent; color: var(--color-primary); }
+.btn--sm { padding: 6px 12px; font-size: 0.85rem; }
+.btn--block { display: flex; width: 100%; }
+.btn:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }

@@ -1,0 +1,6 @@
+/* Liste de notifications */
+.notif { display: flex; gap: var(--space-3); padding: var(--space-4); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+.notif:last-child { border-bottom: 0; }
+.notif.is-unread { background: var(--color-primary-soft); }
+.notif__title { font-weight: 600; }
+.notif__date { font-size: 0.8rem; color: var(--color-text-muted); }

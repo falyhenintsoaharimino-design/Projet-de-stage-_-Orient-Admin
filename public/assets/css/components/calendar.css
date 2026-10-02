@@ -1,0 +1,21 @@
+/* Calendrier et créneaux horaires (flexbox, 7 colonnes par semaine) */
+.calendar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.calendar__weekday, .cal-day, .cal-empty {
+  flex: 1 1 calc(100% / 7 - var(--space-2) * 6 / 7);
+  max-width: calc(100% / 7 - var(--space-2) * 6 / 7);
+}
+.calendar__weekday { text-align: center; font-size: 0.8rem; color: var(--color-text-muted); font-weight: 600; padding: var(--space-1) 0; }
+.cal-day {
+  border: 0; border-radius: var(--radius-sm); padding: 12px 0;
+  background: var(--color-primary-soft); text-align: center; font-weight: 500;
+}
+.cal-day:hover { background: #dbeafe; }
+.cal-day.is-selected { background: var(--color-primary); color: #fff; }
+.cal-day.is-disabled, .cal-day:disabled { background: var(--color-bg); color: var(--color-border); cursor: not-allowed; }
+.cal-empty { visibility: hidden; }
+
+.slots { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.slot { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-sm); padding: 8px 16px; }
+.slot:hover { border-color: var(--color-primary); }
+.slot.is-selected { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.slot:disabled { color: var(--color-border); background: var(--color-bg); cursor: not-allowed; }
