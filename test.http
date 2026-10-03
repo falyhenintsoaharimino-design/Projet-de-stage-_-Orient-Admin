@@ -10,3 +10,32 @@ Content-Type: application/json
 GET http://127.0.0.1:8000/api/services
 ###
 GET http://127.0.0.1:8000/api/procedures
+
+### --- Étape 1 : créneaux et rendez-vous (remplacer TOKEN_AGENT / TOKEN_CITOYEN) ---
+### Agent : créer des créneaux
+POST http://127.0.0.1:8000/api/creneaux
+Authorization: Bearer TOKEN_AGENT
+Content-Type: application/json
+
+{ "date": "2026-10-12", "heures": ["08:00", "08:30", "09:00"] }
+
+###
+### Citoyen : créneaux disponibles d'un service
+GET http://127.0.0.1:8000/api/creneaux?serviceId=1&date=2026-10-12
+Authorization: Bearer TOKEN_CITOYEN
+
+###
+### Citoyen : réserver
+POST http://127.0.0.1:8000/api/rendez-vous
+Authorization: Bearer TOKEN_CITOYEN
+Content-Type: application/json
+
+{ "demandeId": 1, "creneauId": 1 }
+
+###
+GET http://127.0.0.1:8000/api/rendez-vous
+Authorization: Bearer TOKEN_CITOYEN
+
+###
+PATCH http://127.0.0.1:8000/api/rendez-vous/1/annuler
+Authorization: Bearer TOKEN_CITOYEN

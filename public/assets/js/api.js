@@ -112,6 +112,19 @@
     return request("/demandes/" + id + "/statut", { method: "PATCH", body: { statut: statut } });
   }
 
+  /* ----- Créneaux et rendez-vous ----- */
+  function listCreneaux(serviceId, date) {
+    var q = [];
+    if (serviceId) { q.push("serviceId=" + encodeURIComponent(serviceId)); }
+    if (date) { q.push("date=" + encodeURIComponent(date)); }
+    return request("/creneaux" + (q.length ? "?" + q.join("&") : ""));
+  }
+  function creerRendezVous(demandeId, creneauId) {
+    return request("/rendez-vous", { method: "POST", body: { demandeId: demandeId, creneauId: creneauId } });
+  }
+  function listRendezVous() { return request("/rendez-vous"); }
+  function annulerRendezVous(id) { return request("/rendez-vous/" + id + "/annuler", { method: "PATCH" }); }
+
   window.OrientAdmin.api = {
     getToken: getToken, getUser: getUser, isLoggedIn: isLoggedIn, roleEspace: roleEspace,
     login: login, register: register, logout: logout,
@@ -119,6 +132,8 @@
     listProcedures: listProcedures, getProcedure: getProcedure,
     testerOrientation: testerOrientation, creerDemande: creerDemande,
     listDemandes: listDemandes, getDemande: getDemande,
-    reorienterDemande: reorienterDemande, changerStatutDemande: changerStatutDemande
+    reorienterDemande: reorienterDemande, changerStatutDemande: changerStatutDemande,
+    listCreneaux: listCreneaux, creerRendezVous: creerRendezVous,
+    listRendezVous: listRendezVous, annulerRendezVous: annulerRendezVous
   };
 })();

@@ -16,6 +16,33 @@ class CreneauRepository extends ServiceEntityRepository
         parent::__construct($registry, Creneau::class);
     }
 
+    /**
+     * Créneaux d'un service (ou de tous), à partir d'aujourd'hui, triés par
+     * date puis heure. $date (Y-m-d) restreint à un jour précis.
+     *
+     * @return Creneau[]
+     */
+    public function rechercher(?int $serviceId, ?string $date, bool $seulementDisponibles): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.date >= :aujourdhui')
+            ->setParameter('aujourdhui', (new \DateTime('today'))->format('Y-m-d'))
+            ->orderBy('c.date', 'ASC')
+            ->addOrderBy('c.heure', 'ASC');
+
+        if ($serviceId !== null) {
+            $qb->andWhere('c.service = :service')->setParameter('service', $serviceId);
+        }
+        if ($date !== null) {
+            $qb->andWhere('c.date = :date')->setParameter('date', $date);
+        }
+        if ($seulementDisponibles) {
+            $qb->andWhere('c.disponible = true');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
 //    /**
 //     * @return Creneau[] Returns an array of Creneau objects
 //     */
