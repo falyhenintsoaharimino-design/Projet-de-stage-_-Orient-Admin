@@ -100,8 +100,11 @@
   function testerOrientation(texte) {
     return request("/orientation/tester", { method: "POST", body: { texte: texte } });
   }
-  function creerDemande(texte) {
-    return request("/demandes", { method: "POST", body: { texte: texte } });
+  // serviceId (facultatif) : le citoyen choisit lui-même le service, sans passer par le moteur
+  function creerDemande(texte, serviceId) {
+    var corps = { texte: texte };
+    if (serviceId) { corps.serviceId = serviceId; }
+    return request("/demandes", { method: "POST", body: corps });
   }
   function listDemandes() { return request("/demandes"); }
   function getDemande(id) { return request("/demandes/" + id); }
@@ -123,6 +126,12 @@
     return request("/rendez-vous", { method: "POST", body: { demandeId: demandeId, creneauId: creneauId } });
   }
   function listRendezVous() { return request("/rendez-vous"); }
+  function decisionRendezVous(id, decision) {
+    return request("/rendez-vous/" + id + "/decision", { method: "PATCH", body: { decision: decision } });
+  }
+  function statutRendezVous(id, statut) {
+    return request("/rendez-vous/" + id + "/statut", { method: "PATCH", body: { statut: statut } });
+  }
   function annulerRendezVous(id) { return request("/rendez-vous/" + id + "/annuler", { method: "PATCH" }); }
 
   window.OrientAdmin.api = {
@@ -134,6 +143,7 @@
     listDemandes: listDemandes, getDemande: getDemande,
     reorienterDemande: reorienterDemande, changerStatutDemande: changerStatutDemande,
     listCreneaux: listCreneaux, creerRendezVous: creerRendezVous,
-    listRendezVous: listRendezVous, annulerRendezVous: annulerRendezVous
+    listRendezVous: listRendezVous, annulerRendezVous: annulerRendezVous,
+    decisionRendezVous: decisionRendezVous, statutRendezVous: statutRendezVous
   };
 })();

@@ -116,8 +116,9 @@
       ? escapeHtml(service.nom) + " - " + libelleJour(c.date) + " à " + escapeHtml(c.heure)
       : "Aucun créneau choisi pour le moment.";
     return '<h3 class="mt-5">Récapitulatif</h3><p class="text-muted">' + ligne + "</p>"
+      + '<p class="text-small text-muted">Votre rendez-vous devra être confirmé par un agent du service.</p>'
       + '<div class="card__footer"><button class="btn btn--success" type="button" id="rdv-confirmer"'
-      + (c ? "" : " disabled") + ">Confirmer le rendez-vous</button></div>";
+      + (c ? "" : " disabled") + ">Demander ce rendez-vous</button></div>";
   }
 
   function render() {

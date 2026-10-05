@@ -139,7 +139,7 @@ class CreneauApiController extends AbstractController
             return $this->json(['error' => 'disponible (booléen) est requis'], 400);
         }
         if ($data['disponible'] && $this->aRendezVousActif($creneau)) {
-            return $this->json(['error' => 'Ce créneau a un rendez-vous confirmé'], 409);
+            return $this->json(['error' => 'Ce créneau a un rendez-vous en cours'], 409);
         }
 
         $creneau->setDisponible($data['disponible']);
@@ -188,7 +188,7 @@ class CreneauApiController extends AbstractController
 
     private function aRendezVousActif(Creneau $creneau): bool
     {
-        return $this->rendezVousRepository->findOneBy(['creneau' => $creneau, 'statut' => 'confirme']) !== null;
+        return $this->rendezVousRepository->findOneBy(['creneau' => $creneau, 'statut' => ['en_attente', 'confirme']]) !== null;
     }
 
     private function dateValide(string $date): bool

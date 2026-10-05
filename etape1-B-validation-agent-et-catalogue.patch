@@ -1,0 +1,592 @@
+diff --git a/public/assets/js/api.js b/public/assets/js/api.js
+index 1865424..5aa1e6e 100644
+--- a/public/assets/js/api.js
++++ b/public/assets/js/api.js
+@@ -100,8 +100,11 @@
+   function testerOrientation(texte) {
+     return request("/orientation/tester", { method: "POST", body: { texte: texte } });
+   }
+-  function creerDemande(texte) {
+-    return request("/demandes", { method: "POST", body: { texte: texte } });
++  // serviceId (facultatif) : le citoyen choisit lui-même le service, sans passer par le moteur
++  function creerDemande(texte, serviceId) {
++    var corps = { texte: texte };
++    if (serviceId) { corps.serviceId = serviceId; }
++    return request("/demandes", { method: "POST", body: corps });
+   }
+   function listDemandes() { return request("/demandes"); }
+   function getDemande(id) { return request("/demandes/" + id); }
+@@ -123,6 +126,12 @@
+     return request("/rendez-vous", { method: "POST", body: { demandeId: demandeId, creneauId: creneauId } });
+   }
+   function listRendezVous() { return request("/rendez-vous"); }
++  function decisionRendezVous(id, decision) {
++    return request("/rendez-vous/" + id + "/decision", { method: "PATCH", body: { decision: decision } });
++  }
++  function statutRendezVous(id, statut) {
++    return request("/rendez-vous/" + id + "/statut", { method: "PATCH", body: { statut: statut } });
++  }
+   function annulerRendezVous(id) { return request("/rendez-vous/" + id + "/annuler", { method: "PATCH" }); }
+ 
+   window.OrientAdmin.api = {
+@@ -134,6 +143,7 @@
+     listDemandes: listDemandes, getDemande: getDemande,
+     reorienterDemande: reorienterDemande, changerStatutDemande: changerStatutDemande,
+     listCreneaux: listCreneaux, creerRendezVous: creerRendezVous,
+-    listRendezVous: listRendezVous, annulerRendezVous: annulerRendezVous
++    listRendezVous: listRendezVous, annulerRendezVous: annulerRendezVous,
++    decisionRendezVous: decisionRendezVous, statutRendezVous: statutRendezVous
+   };
+ })();
+diff --git a/public/assets/js/pages/agent-rendez-vous.js b/public/assets/js/pages/agent-rendez-vous.js
+new file mode 100644
+index 0000000..181cd86
+--- /dev/null
++++ b/public/assets/js/pages/agent-rendez-vous.js
+@@ -0,0 +1,99 @@
++/* ==========================================================================
++   Rendez-vous du service de l'agent — GET /api/rendez-vous (déjà filtré sur
++   son service), PATCH .../decision (confirmer / refuser),
++   PATCH .../statut (termine / absent), PATCH .../annuler.
++   ========================================================================== */
++(function () {
++  "use strict";
++
++  var api = window.OrientAdmin.api;
++  var conteneur = document.getElementById("liste-rdv-agent");
++  var sousTitre = document.getElementById("rdv-agent-soustitre");
++  if (!conteneur || !api) { return; }
++
++  var STATUTS = {
++    en_attente: ["En attente", "warning"],
++    confirme: ["Confirmé", "success"],
++    refuse: ["Refusé", "danger"],
++    annule: ["Annulé", "neutral"],
++    termine: ["Terminé", "neutral"],
++    absent: ["Absent", "danger"]
++  };
++
++  function escapeHtml(s) {
++    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
++      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
++    });
++  }
++  function formatDate(iso) { var p = iso.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
++
++  function boutons(r) {
++    function b(action, id, texte, classe) {
++      return '<button class="btn ' + classe + ' btn--sm" type="button" data-action="' + action + '" data-id="' + id + '">' + texte + "</button> ";
++    }
++    if (r.statut === "en_attente") {
++      return b("confirmer", r.id, "Confirmer", "btn--success") + b("refuser", r.id, "Refuser", "btn--outline");
++    }
++    if (r.statut === "confirme") {
++      return b("termine", r.id, "Terminé", "btn--primary") + b("absent", r.id, "Absent", "btn--outline")
++        + b("annuler", r.id, "Annuler", "btn--outline");
++    }
++    return "";
++  }
++
++  function charger() {
++    api.listRendezVous().then(function (liste) {
++      var enAttente = liste.filter(function (r) { return r.statut === "en_attente"; }).length;
++      if (sousTitre) {
++        sousTitre.textContent = enAttente
++          ? enAttente + " rendez-vous en attente de votre validation"
++          : "Aucun rendez-vous en attente de validation";
++      }
++      if (!liste.length) {
++        conteneur.innerHTML = '<div class="card"><p>Aucun rendez-vous pour votre service pour le moment.</p></div>';
++        return;
++      }
++      // Les rendez-vous à valider passent en premier, puis par date.
++      liste.sort(function (a, b) {
++        var pa = a.statut === "en_attente" ? 0 : 1, pb = b.statut === "en_attente" ? 0 : 1;
++        return pa - pb || (a.date + a.heure).localeCompare(b.date + b.heure);
++      });
++      var lignes = liste.map(function (r) {
++        var st = STATUTS[r.statut] || [r.statut, "neutral"];
++        return "<tr><td>" + formatDate(r.date) + " " + escapeHtml(r.heure) + "</td>"
++          + "<td>" + escapeHtml((r.citoyenPrenom || "") + " " + (r.citoyenNom || "")) + "</td>"
++          + "<td>" + escapeHtml(r.demande.texte) + "</td>"
++          + '<td><span class="badge badge--' + st[1] + '">' + st[0] + "</span></td>"
++          + "<td>" + boutons(r) + "</td></tr>";
++      }).join("");
++      conteneur.innerHTML = '<div class="table-wrap"><table class="table"><thead><tr>'
++        + "<th>Date</th><th>Citoyen</th><th>Objet</th><th>Statut</th><th>Actions</th>"
++        + "</tr></thead><tbody>" + lignes + "</tbody></table></div>";
++    }).catch(function () {
++      conteneur.innerHTML = '<p class="text-muted">Impossible de charger les rendez-vous pour le moment.</p>';
++    });
++  }
++
++  conteneur.addEventListener("click", function (event) {
++    var bouton = event.target.closest("[data-action]");
++    if (!bouton) { return; }
++    var action = bouton.dataset.action, id = bouton.dataset.id, appel;
++
++    if (action === "confirmer" || action === "refuser") {
++      if (action === "refuser" && !window.confirm("Refuser ce rendez-vous ? Le créneau sera libéré.")) { return; }
++      appel = api.decisionRendezVous(id, action);
++    } else if (action === "annuler") {
++      if (!window.confirm("Annuler ce rendez-vous ? Le créneau sera libéré.")) { return; }
++      appel = api.annulerRendezVous(id);
++    } else {
++      appel = api.statutRendezVous(id, action);
++    }
++    bouton.disabled = true;
++    appel.then(charger).catch(function (err) {
++      window.alert(err.message || "Action impossible.");
++      charger();
++    });
++  });
++
++  charger();
++})();
+diff --git a/public/assets/js/pages/mes-rendez-vous.js b/public/assets/js/pages/mes-rendez-vous.js
+new file mode 100644
+index 0000000..4b6dfd2
+--- /dev/null
++++ b/public/assets/js/pages/mes-rendez-vous.js
+@@ -0,0 +1,66 @@
++/* ==========================================================================
++   Mes rendez-vous (citoyen) — GET /api/rendez-vous (filtré côté serveur sur
++   le citoyen connecté), PATCH /api/rendez-vous/{id}/annuler.
++   ========================================================================== */
++(function () {
++  "use strict";
++
++  var api = window.OrientAdmin.api;
++  var conteneur = document.getElementById("liste-rdv");
++  if (!conteneur || !api) { return; }
++
++  var STATUTS = {
++    en_attente: ["En attente de validation", "warning"],
++    confirme: ["Confirmé", "success"],
++    refuse: ["Refusé", "danger"],
++    annule: ["Annulé", "neutral"],
++    termine: ["Terminé", "neutral"],
++    absent: ["Absent", "danger"]
++  };
++
++  function escapeHtml(s) {
++    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
++      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
++    });
++  }
++  function formatDate(iso) { var p = iso.split("-"); return p[2] + "/" + p[1] + "/" + p[0]; }
++
++  function charger() {
++    api.listRendezVous().then(function (liste) {
++      if (!liste.length) {
++        conteneur.innerHTML = '<div class="card"><p>Vous n\'avez aucun rendez-vous pour le moment.</p></div>';
++        return;
++      }
++      var lignes = liste.map(function (r) {
++        var st = STATUTS[r.statut] || [r.statut, "neutral"];
++        var lieu = escapeHtml(r.service.nom) + (r.service.adresse ? " — " + escapeHtml(r.service.adresse) : "");
++        var action = (r.statut === "en_attente" || r.statut === "confirme")
++          ? '<button class="btn btn--outline btn--sm" type="button" data-annuler="' + r.id + '">Annuler</button>'
++          : "";
++        return "<tr><td>" + escapeHtml(r.demande.texte) + "</td>"
++          + "<td>" + formatDate(r.date) + " " + escapeHtml(r.heure) + "</td>"
++          + "<td>" + lieu + "</td>"
++          + '<td><span class="badge badge--' + st[1] + '">' + st[0] + "</span></td>"
++          + "<td>" + action + "</td></tr>";
++      }).join("");
++      conteneur.innerHTML = '<div class="table-wrap"><table class="table"><thead><tr>'
++        + "<th>Objet</th><th>Date</th><th>Lieu</th><th>Statut</th><th></th>"
++        + "</tr></thead><tbody>" + lignes + "</tbody></table></div>";
++    }).catch(function () {
++      conteneur.innerHTML = '<p class="text-muted">Impossible de charger vos rendez-vous pour le moment.</p>';
++    });
++  }
++
++  conteneur.addEventListener("click", function (event) {
++    var bouton = event.target.closest("[data-annuler]");
++    if (!bouton) { return; }
++    if (!window.confirm("Annuler ce rendez-vous ?")) { return; }
++    bouton.disabled = true;
++    api.annulerRendezVous(bouton.dataset.annuler).then(charger).catch(function (err) {
++      window.alert(err.message || "Annulation impossible.");
++      bouton.disabled = false;
++    });
++  });
++
++  charger();
++})();
+diff --git a/public/assets/js/pages/prendre-rendez-vous.js b/public/assets/js/pages/prendre-rendez-vous.js
+index 976e81b..85dabe7 100644
+--- a/public/assets/js/pages/prendre-rendez-vous.js
++++ b/public/assets/js/pages/prendre-rendez-vous.js
+@@ -116,8 +116,9 @@
+       ? escapeHtml(service.nom) + " - " + libelleJour(c.date) + " à " + escapeHtml(c.heure)
+       : "Aucun créneau choisi pour le moment.";
+     return '<h3 class="mt-5">Récapitulatif</h3><p class="text-muted">' + ligne + "</p>"
++      + '<p class="text-small text-muted">Votre rendez-vous devra être confirmé par un agent du service.</p>'
+       + '<div class="card__footer"><button class="btn btn--success" type="button" id="rdv-confirmer"'
+-      + (c ? "" : " disabled") + ">Confirmer le rendez-vous</button></div>";
++      + (c ? "" : " disabled") + ">Demander ce rendez-vous</button></div>";
+   }
+ 
+   function render() {
+diff --git a/public/assets/js/pages/procedure-detail.js b/public/assets/js/pages/procedure-detail.js
+index b6f04d3..795ff65 100644
+--- a/public/assets/js/pages/procedure-detail.js
++++ b/public/assets/js/pages/procedure-detail.js
+@@ -7,7 +7,8 @@
+ 
+   var api = window.OrientAdmin.api;
+   var root = document.body.dataset.root || "./";
+-  var role = document.body.dataset.role || "visiteur";
++  // Les pages du catalogue sont "visiteur" dans le HTML : le vrai rôle vient de la session.
++  var espace = api && api.isLoggedIn() ? api.roleEspace(api.getUser()) : null;
+   var conteneur = document.getElementById("fiche-procedure");
+   if (!conteneur || !api) { return; }
+ 
+@@ -31,9 +32,13 @@
+         }).join("") + "</ul>"
+       : "<p class=\"text-muted\">Pièces à préciser par le service concerné.</p>";
+ 
+-    var lienRdv = role === "citoyen"
+-      ? root + "pages/citoyen/prendre-rendez-vous.html"
+-      : root + "pages/auth/connexion.html";
++    var boutonRdv = "";
++    if (espace === "citoyen") {
++      boutonRdv = '<button class="btn btn--primary btn--block" type="button" id="btn-rdv">Prendre rendez-vous</button>'
++        + '<p class="text-small text-danger mt-3" id="erreur-rdv" hidden></p>';
++    } else if (!espace) {
++      boutonRdv = '<a class="btn btn--primary btn--block" href="' + root + 'pages/auth/connexion.html">Se connecter pour prendre rendez-vous</a>';
++    }
+ 
+     conteneur.innerHTML =
+       '<header class="page-head"><div><h1>' + escapeHtml(procedure.nom) + '</h1>' +
+@@ -44,8 +49,23 @@
+       '<div class="card"><h3 class="card__title">Informations pratiques</h3><dl class="info-list">' +
+       '<dt>Délai indicatif</dt><dd>' + escapeHtml(procedure.delaiEstime || 'Non renseigné') + '</dd>' +
+       '<dt>Frais indicatifs</dt><dd>' + escapeHtml(procedure.frais || 'Non renseignés') + '</dd>' +
+-      '</dl><div class="card__footer"><a class="btn btn--primary btn--block" href="' + lienRdv + '">Prendre rendez-vous</a></div></div>' +
++      '</dl><div class="card__footer">' + boutonRdv + '</div></div>' +
+       '</div><p class="text-small text-muted mt-5">Information indicative : le service compétent reste seul habilité à confirmer les modalités exactes.</p>';
++    var bouton = document.getElementById("btn-rdv");
++    if (bouton) {
++      bouton.addEventListener("click", function () {
++        bouton.disabled = true;
++        // La demande est créée directement vers le service de la procédure, puis on choisit le créneau.
++        api.creerDemande("Rendez-vous : " + procedure.nom, procedure.service.id).then(function (demande) {
++          window.location.href = root + "pages/citoyen/prendre-rendez-vous.html?demandeId=" + demande.id;
++        }).catch(function (err) {
++          var zone = document.getElementById("erreur-rdv");
++          zone.textContent = err.message || "Impossible de créer la demande pour le moment.";
++          zone.hidden = false;
++          bouton.disabled = false;
++        });
++      });
++    }
+   }).catch(function () {
+     conteneur.innerHTML = "<p class=\"text-muted\">Cette procédure est introuvable ou n'est plus disponible.</p>";
+   });
+diff --git a/public/pages/agent/rendez-vous.html b/public/pages/agent/rendez-vous.html
+index 5ac3479..891276a 100644
+--- a/public/pages/agent/rendez-vous.html
++++ b/public/pages/agent/rendez-vous.html
+@@ -15,40 +15,10 @@
+       <header class="page-head">
+         <div>
+           <h1>Rendez-vous</h1>
+-          <p class="text-muted">Jeudi 24 septembre 2026</p>
++          <p class="text-muted" id="rdv-agent-soustitre">Chargement...</p>
+         </div>
+-      </header><div class="table-wrap">
+-        <table class="table">
+-          <thead>
+-            <tr>
+-              <th>Heure</th>
+-              <th>Citoyen</th>
+-              <th>Objet</th>
+-              <th>Statut</th>
+-            </tr>
+-          </thead>
+-          <tbody>
+-            <tr>
+-              <td>09:00</td>
+-              <td>HARIMINO Faly</td>
+-              <td>Légalisation diplôme</td>
+-              <td><span class="badge badge--success">Confirmé</span></td>
+-            </tr>
+-            <tr>
+-              <td>09:30</td>
+-              <td>RAKOTO Nirina</td>
+-              <td>Légalisation acte</td>
+-              <td><span class="badge badge--success">Confirmé</span></td>
+-            </tr>
+-            <tr>
+-              <td>10:00</td>
+-              <td>-</td>
+-              <td>-</td>
+-              <td><span class="badge badge--success">Actif</span></td>
+-            </tr>
+-          </tbody>
+-        </table>
+-      </div>
++      </header>
++      <div id="liste-rdv-agent"></div>
+     </main>
+   </div>
+   <div id="site-footer"></div>
+@@ -56,5 +26,6 @@
+   <script src="../../assets/js/api.js"></script>
+   <script src="../../assets/js/components/layout.js"></script>
+   <script src="../../assets/js/main.js"></script>
++  <script src="../../assets/js/pages/agent-rendez-vous.js"></script>
+ </body>
+ </html>
+diff --git a/public/pages/citoyen/mes-rendez-vous.html b/public/pages/citoyen/mes-rendez-vous.html
+index 0eda0b2..2ed395e 100644
+--- a/public/pages/citoyen/mes-rendez-vous.html
++++ b/public/pages/citoyen/mes-rendez-vous.html
+@@ -17,32 +17,7 @@
+           <h1>Mes rendez-vous</h1>
+         </div>
+         <div class="page-head__actions"><a class="btn btn--primary" href="prendre-rendez-vous.html">Prendre un rendez-vous</a></div>
+-      </header><div class="table-wrap">
+-        <table class="table">
+-          <thead>
+-            <tr>
+-              <th>Objet</th>
+-              <th>Date</th>
+-              <th>Lieu</th>
+-              <th>Statut</th>
+-            </tr>
+-          </thead>
+-          <tbody>
+-            <tr>
+-              <td>Légalisation de diplôme</td>
+-              <td>24/09/2026 09:00</td>
+-              <td>Hôtel de ville, bureau 12</td>
+-              <td><span class="badge badge--success">Confirmé</span></td>
+-            </tr>
+-            <tr>
+-              <td>Certificat de résidence</td>
+-              <td>10/09/2026 14:00</td>
+-              <td>Fokontany</td>
+-              <td><span class="badge badge--neutral">Terminé</span></td>
+-            </tr>
+-          </tbody>
+-        </table>
+-      </div>
++      </header><div id="liste-rdv"><p class="text-muted">Chargement...</p></div>
+     </main>
+   </div>
+   <div id="site-footer"></div>
+@@ -50,5 +25,6 @@
+   <script src="../../assets/js/api.js"></script>
+   <script src="../../assets/js/components/layout.js"></script>
+   <script src="../../assets/js/main.js"></script>
++  <script src="../../assets/js/pages/mes-rendez-vous.js"></script>
+ </body>
+ </html>
+diff --git a/src/Controller/CreneauApiController.php b/src/Controller/CreneauApiController.php
+index 46e4ec2..dd12ff2 100644
+--- a/src/Controller/CreneauApiController.php
++++ b/src/Controller/CreneauApiController.php
+@@ -139,7 +139,7 @@ class CreneauApiController extends AbstractController
+             return $this->json(['error' => 'disponible (booléen) est requis'], 400);
+         }
+         if ($data['disponible'] && $this->aRendezVousActif($creneau)) {
+-            return $this->json(['error' => 'Ce créneau a un rendez-vous confirmé'], 409);
++            return $this->json(['error' => 'Ce créneau a un rendez-vous en cours'], 409);
+         }
+ 
+         $creneau->setDisponible($data['disponible']);
+@@ -188,7 +188,7 @@ class CreneauApiController extends AbstractController
+ 
+     private function aRendezVousActif(Creneau $creneau): bool
+     {
+-        return $this->rendezVousRepository->findOneBy(['creneau' => $creneau, 'statut' => 'confirme']) !== null;
++        return $this->rendezVousRepository->findOneBy(['creneau' => $creneau, 'statut' => ['en_attente', 'confirme']]) !== null;
+     }
+ 
+     private function dateValide(string $date): bool
+diff --git a/src/Controller/DemandeApiController.php b/src/Controller/DemandeApiController.php
+index b97e3a9..e1545db 100644
+--- a/src/Controller/DemandeApiController.php
++++ b/src/Controller/DemandeApiController.php
+@@ -47,7 +47,19 @@ class DemandeApiController extends AbstractController
+             return $this->json(['error' => 'Le texte de la demande est requis'], 400);
+         }
+ 
+-        $resultat = $this->orientationEngine->orienter($texte);
++        // Le citoyen peut choisir lui-même le service (ex. depuis une fiche
++        // procédure) : le moteur d'orientation n'est alors pas sollicité.
++        $serviceChoisi = null;
++        if (!empty($data['serviceId'])) {
++            $serviceChoisi = $this->serviceRepository->find($data['serviceId']);
++            if (!$serviceChoisi) {
++                return $this->json(['error' => 'Service introuvable'], 404);
++            }
++        }
++
++        $resultat = $serviceChoisi
++            ? ['service' => null, 'confiance' => null, 'alternatives' => []]
++            : $this->orientationEngine->orienter($texte);
+ 
+         $demande = new Demande();
+         $demande->setTextDemande($texte);
+@@ -58,7 +70,8 @@ class DemandeApiController extends AbstractController
+         // Sans service reconnu avec assez de confiance, la demande reste
+         // "soumise" : un agent ou l'administrateur devra l'orienter à la main
+         // (voir EF-16 : ne jamais orienter au hasard).
+-        $demande->setStatus($resultat['service'] ? 'orientee' : 'soumise');
++        $demande->setServiceFinal($serviceChoisi);
++        $demande->setStatus(($serviceChoisi || $resultat['service']) ? 'orientee' : 'soumise');
+ 
+         $historique = new HistoriqueStatut();
+         $historique->setStatut($demande->getStatus());
+diff --git a/src/Controller/RendezVousApiController.php b/src/Controller/RendezVousApiController.php
+index 8a38547..999aa04 100644
+--- a/src/Controller/RendezVousApiController.php
++++ b/src/Controller/RendezVousApiController.php
+@@ -16,9 +16,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
+ use Symfony\Component\Security\Http\Attribute\IsGranted;
+ 
+ /**
+- * Rendez-vous liés à une demande. Le citoyen réserve et annule les siens ;
+- * l'agent voit ceux de son service, les annule et note l'issue (termine /
+- * absent) ; admin et responsable consultent tout.
++ * Rendez-vous liés à une demande. Le citoyen réserve (statut en_attente) et
++ * annule les siens ; l'agent voit ceux de son service, les confirme ou les
++ * refuse, les annule et note l'issue (termine / absent) ; admin et
++ * responsable consultent tout.
+  */
+ #[Route('/api/rendez-vous')]
+ class RendezVousApiController extends AbstractController
+@@ -119,6 +120,36 @@ class RendezVousApiController extends AbstractController
+         return $this->json($this->toArray($rdv));
+     }
+ 
++    /** Décision de l'agent sur un rendez-vous en attente : { "decision": "confirmer" | "refuser" } */
++    #[Route('/{id}/decision', name: 'api_rdv_decision', methods: ['PATCH'], requirements: ['id' => '\d+'])]
++    #[IsGranted('ROLE_AGENT')]
++    public function decision(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
++    {
++        $rdv = $this->rendezVousRepository->find($id);
++        if (!$rdv) {
++            return $this->json(['error' => 'Rendez-vous non trouvé'], 404);
++        }
++        if (!$this->peutAcceder($rdv, $utilisateur, false)) {
++            return $this->json(['error' => 'Accès refusé'], 403);
++        }
++
++        $data = json_decode($request->getContent(), true) ?? [];
++        $decision = $data['decision'] ?? '';
++        if (!in_array($decision, ['confirmer', 'refuser'], true)) {
++            return $this->json(['error' => 'decision invalide (confirmer ou refuser)'], 400);
++        }
++
++        try {
++            $decision === 'confirmer'
++                ? $this->rendezVousService->confirmer($rdv)
++                : $this->rendezVousService->refuser($rdv);
++        } catch (\DomainException $e) {
++            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
++        }
++
++        return $this->json($this->toArray($rdv));
++    }
++
+     /** Issue du rendez-vous, notée par l'agent : { "statut": "termine" | "absent" } */
+     #[Route('/{id}/statut', name: 'api_rdv_statut', methods: ['PATCH'], requirements: ['id' => '\d+'])]
+     #[IsGranted('ROLE_AGENT')]
+diff --git a/src/Service/RendezVousService.php b/src/Service/RendezVousService.php
+index ae2435a..c383ae1 100644
+--- a/src/Service/RendezVousService.php
++++ b/src/Service/RendezVousService.php
+@@ -15,7 +15,9 @@ use Doctrine\ORM\EntityManagerInterface;
+  * Les erreurs sont signalées par une \DomainException dont le code est le
+  * statut HTTP à renvoyer (404, 409, 422...).
+  *
+- * Statuts de RendezVous : confirme, annule, termine, absent.
++ * Statuts de RendezVous : en_attente (réservé par le citoyen, en attente de
++ * validation par un agent), confirme, refuse, annule, termine, absent.
++ * Les statuts en_attente et confirme bloquent le créneau.
+  */
+ class RendezVousService
+ {
+@@ -34,8 +36,8 @@ class RendezVousService
+         if (in_array($demande->getStatus(), ['cloturee', 'annulee'], true)) {
+             throw new \DomainException('Cette demande est déjà terminée ou annulée', 409);
+         }
+-        if ($this->rendezVousRepository->findOneBy(['demande' => $demande, 'statut' => 'confirme'])) {
+-            throw new \DomainException('Cette demande a déjà un rendez-vous confirmé', 409);
++        if ($this->rendezVousRepository->findOneBy(['demande' => $demande, 'statut' => ['en_attente', 'confirme']])) {
++            throw new \DomainException('Cette demande a déjà un rendez-vous en cours', 409);
+         }
+ 
+         // Transaction + verrou sur le créneau : deux citoyens ne peuvent pas
+@@ -58,7 +60,7 @@ class RendezVousService
+             $rdv = new RendezVous();
+             $rdv->setDemande($demande);
+             $rdv->setCreneau($creneau);
+-            $rdv->setStatut('confirme');
++            $rdv->setStatut('en_attente');
+             $creneau->setDisponible(false);
+ 
+             $demande->setStatus('rendez_vous_pris');
+@@ -70,13 +72,37 @@ class RendezVousService
+         });
+     }
+ 
++    /** Agent : valide un rendez-vous en attente. */
++    public function confirmer(RendezVous $rdv): void
++    {
++        if ($rdv->getStatut() !== 'en_attente') {
++            throw new \DomainException('Seul un rendez-vous en attente peut être confirmé', 409);
++        }
++        $rdv->setStatut('confirme');
++        $this->em->flush();
++    }
++
++    /** Agent : refuse un rendez-vous en attente ; le créneau est libéré. */
++    public function refuser(RendezVous $rdv): void
++    {
++        if ($rdv->getStatut() !== 'en_attente') {
++            throw new \DomainException('Seul un rendez-vous en attente peut être refusé', 409);
++        }
++        $this->liberer($rdv, 'refuse');
++    }
++
++    /** Citoyen ou agent : annule un rendez-vous en attente ou confirmé. */
+     public function annuler(RendezVous $rdv): void
+     {
+-        if ($rdv->getStatut() !== 'confirme') {
+-            throw new \DomainException('Seul un rendez-vous confirmé peut être annulé', 409);
++        if (!in_array($rdv->getStatut(), ['en_attente', 'confirme'], true)) {
++            throw new \DomainException('Ce rendez-vous ne peut plus être annulé', 409);
+         }
++        $this->liberer($rdv, 'annule');
++    }
+ 
+-        $rdv->setStatut('annule');
++    private function liberer(RendezVous $rdv, string $statutFinal): void
++    {
++        $rdv->setStatut($statutFinal);
+         $rdv->getCreneau()?->setDisponible(true);
+ 
+         $demande = $rdv->getDemande();
+diff --git a/test.http b/test.http
+index 786e14e..5c9eada 100644
+--- a/test.http
++++ b/test.http
+@@ -39,3 +39,11 @@ Authorization: Bearer TOKEN_CITOYEN
+ ###
+ PATCH http://127.0.0.1:8000/api/rendez-vous/1/annuler
+ Authorization: Bearer TOKEN_CITOYEN
++
++###
++### Agent : confirmer ou refuser un rendez-vous en attente
++PATCH http://127.0.0.1:8000/api/rendez-vous/1/decision
++Authorization: Bearer TOKEN_AGENT
++Content-Type: application/json
++
++{ "decision": "confirmer" }

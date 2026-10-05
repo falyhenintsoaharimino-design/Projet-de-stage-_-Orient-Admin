@@ -39,3 +39,11 @@ Authorization: Bearer TOKEN_CITOYEN
 ###
 PATCH http://127.0.0.1:8000/api/rendez-vous/1/annuler
 Authorization: Bearer TOKEN_CITOYEN
+
+###
+### Agent : confirmer ou refuser un rendez-vous en attente
+PATCH http://127.0.0.1:8000/api/rendez-vous/1/decision
+Authorization: Bearer TOKEN_AGENT
+Content-Type: application/json
+
+{ "decision": "confirmer" }

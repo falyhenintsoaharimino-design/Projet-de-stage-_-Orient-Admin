@@ -16,9 +16,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Rendez-vous liés à une demande. Le citoyen réserve et annule les siens ;
- * l'agent voit ceux de son service, les annule et note l'issue (termine /
- * absent) ; admin et responsable consultent tout.
+ * Rendez-vous liés à une demande. Le citoyen réserve (statut en_attente) et
+ * annule les siens ; l'agent voit ceux de son service, les confirme ou les
+ * refuse, les annule et note l'issue (termine / absent) ; admin et
+ * responsable consultent tout.
  */
 #[Route('/api/rendez-vous')]
 class RendezVousApiController extends AbstractController
@@ -112,6 +113,36 @@ class RendezVousApiController extends AbstractController
 
         try {
             $this->rendezVousService->annuler($rdv);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
+
+        return $this->json($this->toArray($rdv));
+    }
+
+    /** Décision de l'agent sur un rendez-vous en attente : { "decision": "confirmer" | "refuser" } */
+    #[Route('/{id}/decision', name: 'api_rdv_decision', methods: ['PATCH'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function decision(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $rdv = $this->rendezVousRepository->find($id);
+        if (!$rdv) {
+            return $this->json(['error' => 'Rendez-vous non trouvé'], 404);
+        }
+        if (!$this->peutAcceder($rdv, $utilisateur, false)) {
+            return $this->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $decision = $data['decision'] ?? '';
+        if (!in_array($decision, ['confirmer', 'refuser'], true)) {
+            return $this->json(['error' => 'decision invalide (confirmer ou refuser)'], 400);
+        }
+
+        try {
+            $decision === 'confirmer'
+                ? $this->rendezVousService->confirmer($rdv)
+                : $this->rendezVousService->refuser($rdv);
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }

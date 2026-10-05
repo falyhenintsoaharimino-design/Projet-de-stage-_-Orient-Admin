@@ -15,7 +15,9 @@ use Doctrine\ORM\EntityManagerInterface;
  * Les erreurs sont signalées par une \DomainException dont le code est le
  * statut HTTP à renvoyer (404, 409, 422...).
  *
- * Statuts de RendezVous : confirme, annule, termine, absent.
+ * Statuts de RendezVous : en_attente (réservé par le citoyen, en attente de
+ * validation par un agent), confirme, refuse, annule, termine, absent.
+ * Les statuts en_attente et confirme bloquent le créneau.
  */
 class RendezVousService
 {
@@ -34,8 +36,8 @@ class RendezVousService
         if (in_array($demande->getStatus(), ['cloturee', 'annulee'], true)) {
             throw new \DomainException('Cette demande est déjà terminée ou annulée', 409);
         }
-        if ($this->rendezVousRepository->findOneBy(['demande' => $demande, 'statut' => 'confirme'])) {
-            throw new \DomainException('Cette demande a déjà un rendez-vous confirmé', 409);
+        if ($this->rendezVousRepository->findOneBy(['demande' => $demande, 'statut' => ['en_attente', 'confirme']])) {
+            throw new \DomainException('Cette demande a déjà un rendez-vous en cours', 409);
         }
 
         // Transaction + verrou sur le créneau : deux citoyens ne peuvent pas
@@ -58,7 +60,7 @@ class RendezVousService
             $rdv = new RendezVous();
             $rdv->setDemande($demande);
             $rdv->setCreneau($creneau);
-            $rdv->setStatut('confirme');
+            $rdv->setStatut('en_attente');
             $creneau->setDisponible(false);
 
             $demande->setStatus('rendez_vous_pris');
@@ -70,13 +72,37 @@ class RendezVousService
         });
     }
 
+    /** Agent : valide un rendez-vous en attente. */
+    public function confirmer(RendezVous $rdv): void
+    {
+        if ($rdv->getStatut() !== 'en_attente') {
+            throw new \DomainException('Seul un rendez-vous en attente peut être confirmé', 409);
+        }
+        $rdv->setStatut('confirme');
+        $this->em->flush();
+    }
+
+    /** Agent : refuse un rendez-vous en attente ; le créneau est libéré. */
+    public function refuser(RendezVous $rdv): void
+    {
+        if ($rdv->getStatut() !== 'en_attente') {
+            throw new \DomainException('Seul un rendez-vous en attente peut être refusé', 409);
+        }
+        $this->liberer($rdv, 'refuse');
+    }
+
+    /** Citoyen ou agent : annule un rendez-vous en attente ou confirmé. */
     public function annuler(RendezVous $rdv): void
     {
-        if ($rdv->getStatut() !== 'confirme') {
-            throw new \DomainException('Seul un rendez-vous confirmé peut être annulé', 409);
+        if (!in_array($rdv->getStatut(), ['en_attente', 'confirme'], true)) {
+            throw new \DomainException('Ce rendez-vous ne peut plus être annulé', 409);
         }
+        $this->liberer($rdv, 'annule');
+    }
 
-        $rdv->setStatut('annule');
+    private function liberer(RendezVous $rdv, string $statutFinal): void
+    {
+        $rdv->setStatut($statutFinal);
         $rdv->getCreneau()?->setDisponible(true);
 
         $demande = $rdv->getDemande();

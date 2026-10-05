@@ -47,7 +47,19 @@ class DemandeApiController extends AbstractController
             return $this->json(['error' => 'Le texte de la demande est requis'], 400);
         }
 
-        $resultat = $this->orientationEngine->orienter($texte);
+        // Le citoyen peut choisir lui-même le service (ex. depuis une fiche
+        // procédure) : le moteur d'orientation n'est alors pas sollicité.
+        $serviceChoisi = null;
+        if (!empty($data['serviceId'])) {
+            $serviceChoisi = $this->serviceRepository->find($data['serviceId']);
+            if (!$serviceChoisi) {
+                return $this->json(['error' => 'Service introuvable'], 404);
+            }
+        }
+
+        $resultat = $serviceChoisi
+            ? ['service' => null, 'confiance' => null, 'alternatives' => []]
+            : $this->orientationEngine->orienter($texte);
 
         $demande = new Demande();
         $demande->setTextDemande($texte);
@@ -58,7 +70,8 @@ class DemandeApiController extends AbstractController
         // Sans service reconnu avec assez de confiance, la demande reste
         // "soumise" : un agent ou l'administrateur devra l'orienter à la main
         // (voir EF-16 : ne jamais orienter au hasard).
-        $demande->setStatus($resultat['service'] ? 'orientee' : 'soumise');
+        $demande->setServiceFinal($serviceChoisi);
+        $demande->setStatus(($serviceChoisi || $resultat['service']) ? 'orientee' : 'soumise');
 
         $historique = new HistoriqueStatut();
         $historique->setStatut($demande->getStatus());
