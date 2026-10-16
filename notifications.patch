@@ -1,0 +1,525 @@
+diff --git a/.env b/.env
+index 707f50c..1dbeed1 100644
+--- a/.env
++++ b/.env
+@@ -51,6 +51,7 @@ MESSENGER_TRANSPORT_DSN=doctrine://default?auto_setup=0
+ 
+ ###> symfony/mailer ###
+ MAILER_DSN=null://null
++MAILER_FROM=no-reply@orient-admin.local
+ ###< symfony/mailer ###
+ 
+ ###> lexik/jwt-authentication-bundle ###
+diff --git a/scripts/smoke.sh b/scripts/smoke.sh
+new file mode 100755
+index 0000000..393dc59
+--- /dev/null
++++ b/scripts/smoke.sh
+@@ -0,0 +1,110 @@
++#!/usr/bin/env bash
++# Recette des notifications (étape 1 du backend).
++# Usage : bash scripts/smoke.sh            (serveur sur http://127.0.0.1:8000)
++#         bash scripts/smoke.sh http://127.0.0.1:8000
++#         SERVICE_ID=2 bash scripts/smoke.sh   (si l'agent n'est pas sur le service 1)
++# Prérequis : symfony serve lancé, comptes de test créés (app:seed-demo), php dans le PATH.
++# Laisse quelques créneaux/rendez-vous de test dans la base (sans danger).
++
++BASE="${1:-http://127.0.0.1:8000}"
++SERVICE_ID="${SERVICE_ID:-1}"
++PASS="motdepasse123"
++NB_OK=0; NB_KO=0
++
++ok()  { echo "OK      $1"; NB_OK=$((NB_OK+1)); }
++ko()  { echo "ÉCHEC   $1  ->  $2"; NB_KO=$((NB_KO+1)); }
++code_attendu() { [ "$CODE" = "$2" ] && ok "$1" || ko "$1" "code $CODE (attendu $2) $BODY"; }
++egal() { [ "$2" = "$3" ] && ok "$1" || ko "$1" "obtenu '$2', attendu '$3'"; }
++
++# jget '<json>' 'a.b.0.c' : lit une valeur dans un JSON (via PHP, pas besoin de jq)
++jget() {
++  printf '%s' "$1" | php -r '$d=json_decode(stream_get_contents(STDIN),true);
++    foreach (explode(".", $argv[1]) as $k) { if (!is_array($d) || !array_key_exists($k, $d)) { exit(0); } $d = $d[$k]; }
++    echo is_bool($d) ? ($d ? "true" : "false") : (is_scalar($d) ? $d : json_encode($d));' -- "$2"
++}
++
++# api METHODE /chemin [token] [corps-json]  ->  remplit CODE et BODY
++api() {
++  local args=(-s -X "$1" "$BASE$2" -H 'Content-Type: application/json' -w $'\n%{http_code}')
++  [ -n "$3" ] && args+=(-H "Authorization: Bearer $3")
++  [ -n "$4" ] && args+=(-d "$4")
++  local out; out=$(curl "${args[@]}")
++  CODE="${out##*$'\n'}"; BODY="${out%$'\n'*}"
++}
++
++login() { api POST /api/login_check "" "{\"email\":\"$1\",\"password\":\"$PASS\"}"; jget "$BODY" token; }
++# plus_recente TOKEN -> NID (id) et NTYPE (type) de la notification la plus récente
++plus_recente() { api GET /api/notifications "$1"; NID=$(jget "$BODY" 0.id); NTYPE=$(jget "$BODY" 0.type); }
++non_lues() { api GET /api/notifications/compteur "$1"; jget "$BODY" nonLues; }
++
++echo "== Connexion =="
++CIT=$(login test@test.com);  [ -n "$CIT" ] && ok "login citoyen" || ko "login citoyen" "$BODY"
++AGT=$(login agent@test.com); [ -n "$AGT" ] && ok "login agent"   || ko "login agent" "$BODY"
++[ -z "$CIT" ] || [ -z "$AGT" ] && { echo "Impossible de continuer sans jetons."; exit 1; }
++
++echo "== Accès =="
++api GET /api/notifications "";    code_attendu "sans jeton -> 401" 401
++api GET /api/notifications "$CIT"; code_attendu "citoyen liste ses notifications" 200
++
++echo "== Préparation : créneaux + demande =="
++JOUR=$(date -d "+$((RANDOM % 300 + 5)) days" +%F)
++h() { printf '"%02d:%02d"' $((8 + RANDOM % 10)) $((RANDOM % 60)); }
++api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}";  C1=$(jget "$BODY" crees.0.id)
++api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}";  C2=$(jget "$BODY" crees.0.id)
++api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}";  C3=$(jget "$BODY" crees.0.id)
++[ -n "$C1" ] && [ -n "$C2" ] && [ -n "$C3" ] && ok "3 créneaux créés ($JOUR)" || ko "créneaux" "relance le script (heure déjà prise ?) $BODY"
++api POST /api/demandes "$CIT" "{\"texte\":\"Recette notifications\",\"serviceId\":$SERVICE_ID}"
++DEM=$(jget "$BODY" id); [ -n "$DEM" ] && ok "demande $DEM créée" || ko "demande" "$BODY"
++
++echo "== 1. Réservation -> citoyen + agent notifiés =="
++AV_CIT=$(non_lues "$CIT"); AV_AGT=$(non_lues "$AGT")
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C1}"; code_attendu "réservation" 201
++RDV=$(jget "$BODY" id)
++plus_recente "$CIT"; egal "citoyen : type rdv_en_attente" "$NTYPE" rdv_en_attente; N_CIT=$NID
++plus_recente "$AGT"; egal "agent : type rdv_a_valider" "$NTYPE" rdv_a_valider
++egal "citoyen : +1 non lue" "$(non_lues "$CIT")" $((AV_CIT+1))
++egal "agent : +1 non lue"   "$(non_lues "$AGT")" $((AV_AGT+1))
++
++echo "== 2. Marquer comme lu =="
++api PATCH "/api/notifications/$N_CIT/lu" "$AGT"; code_attendu "un autre utilisateur ne peut pas la marquer (403)" 403
++api PATCH "/api/notifications/$N_CIT/lu" "$CIT"; code_attendu "le propriétaire la marque lue" 200
++egal "statut = lue" "$(jget "$BODY" statut)" lue
++egal "citoyen : compteur revenu" "$(non_lues "$CIT")" "$AV_CIT"
++api PATCH /api/notifications/99999999/lu "$CIT"; code_attendu "notification inconnue (404)" 404
++
++echo "== 3. Confirmation par l'agent -> citoyen notifié =="
++api PATCH "/api/rendez-vous/$RDV/decision" "$AGT" '{"decision":"confirmer"}'; code_attendu "agent confirme" 200
++plus_recente "$CIT"; egal "citoyen : type rdv_confirme" "$NTYPE" rdv_confirme
++
++echo "== 4. Annulation par le citoyen -> agent notifié =="
++plus_recente "$AGT"; AVANT=$NID
++api PATCH "/api/rendez-vous/$RDV/annuler" "$CIT"; code_attendu "citoyen annule" 200
++plus_recente "$AGT"; egal "agent : type rdv_annule" "$NTYPE" rdv_annule
++[ "$NID" != "$AVANT" ] && ok "agent : nouvelle notification" || ko "agent : nouvelle notification" "même id $NID"
++
++echo "== 5. Refus par l'agent -> citoyen notifié =="
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C2}"; code_attendu "nouvelle réservation" 201
++RDV2=$(jget "$BODY" id)
++api PATCH "/api/rendez-vous/$RDV2/decision" "$AGT" '{"decision":"refuser"}'; code_attendu "agent refuse" 200
++plus_recente "$CIT"; egal "citoyen : type rdv_refuse" "$NTYPE" rdv_refuse
++
++echo "== 6. Annulation par l'agent -> citoyen notifié =="
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C3}"; code_attendu "nouvelle réservation" 201
++RDV3=$(jget "$BODY" id)
++api PATCH "/api/rendez-vous/$RDV3/annuler" "$AGT"; code_attendu "agent annule" 200
++plus_recente "$CIT"; egal "citoyen : type rdv_annule" "$NTYPE" rdv_annule
++
++echo "== 7. Liste, filtre, tout marquer lu, isolation =="
++api GET "/api/notifications?nonLues=1" "$CIT"; code_attendu "filtre nonLues=1" 200
++[ "$(jget "$BODY" 0.statut)" = "non_lue" ] && ok "filtre : premières = non lues" || ko "filtre nonLues" "$BODY"
++api GET /api/notifications "$CIT"
++[ "$(printf '%s' "$BODY" | grep -c rdv_a_valider)" = "0" ] && ok "le citoyen ne voit pas les notifications de l'agent" || ko "isolation" "rdv_a_valider visible côté citoyen"
++api PATCH /api/notifications/lu-tout "$CIT"; code_attendu "tout marquer lu" 200
++egal "citoyen : compteur à 0" "$(non_lues "$CIT")" 0
++api GET "/api/notifications?nonLues=1" "$CIT"; egal "citoyen : plus aucune non lue" "$BODY" "[]"
++[ "$(non_lues "$AGT")" -gt 0 ] && ok "l'agent a toujours les siennes (non touchées)" || ko "isolation lu-tout" "compteur agent à 0"
++
++echo
++echo "Résultat : $NB_OK OK, $NB_KO ÉCHEC"
++echo "E-mails : ils partent dans la file Messenger. Pour les voir : php bin/console messenger:consume async -vv --limit=20"
++[ "$NB_KO" = "0" ]
+diff --git a/src/Controller/NotificationApiController.php b/src/Controller/NotificationApiController.php
+new file mode 100644
+index 0000000..dc472f6
+--- /dev/null
++++ b/src/Controller/NotificationApiController.php
+@@ -0,0 +1,80 @@
++<?php
++
++namespace App\Controller;
++
++use App\Entity\Notification;
++use App\Entity\Utilisateur;
++use App\Repository\NotificationRepository;
++use App\Service\NotificationService;
++use Doctrine\ORM\EntityManagerInterface;
++use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
++use Symfony\Component\HttpFoundation\JsonResponse;
++use Symfony\Component\HttpFoundation\Request;
++use Symfony\Component\Routing\Attribute\Route;
++use Symfony\Component\Security\Http\Attribute\CurrentUser;
++
++/**
++ * Notifications de l'utilisateur connecté (tous rôles). Chacun ne voit et
++ * ne modifie que les siennes.
++ */
++#[Route('/api/notifications')]
++class NotificationApiController extends AbstractController
++{
++    public function __construct(
++        private EntityManagerInterface $em,
++        private NotificationRepository $notificationRepository,
++    ) {
++    }
++
++    /** GET /api/notifications?nonLues=1 (les 50 plus récentes) */
++    #[Route('', name: 'api_notifications_list', methods: ['GET'])]
++    public function list(Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
++    {
++        $nonLues = $request->query->getBoolean('nonLues');
++        $notifications = $this->notificationRepository->pourUtilisateur($utilisateur, $nonLues);
++
++        return $this->json(array_map(fn(Notification $n) => $this->toArray($n), $notifications));
++    }
++
++    /** GET /api/notifications/compteur -> { "nonLues": 3 } */
++    #[Route('/compteur', name: 'api_notifications_compteur', methods: ['GET'])]
++    public function compteur(#[CurrentUser] Utilisateur $utilisateur): JsonResponse
++    {
++        return $this->json(['nonLues' => $this->notificationRepository->compterNonLues($utilisateur)]);
++    }
++
++    #[Route('/lu-tout', name: 'api_notifications_lu_tout', methods: ['PATCH'])]
++    public function luTout(#[CurrentUser] Utilisateur $utilisateur): JsonResponse
++    {
++        return $this->json(['marquees' => $this->notificationRepository->toutMarquerLu($utilisateur)]);
++    }
++
++    #[Route('/{id}/lu', name: 'api_notifications_lu', methods: ['PATCH'], requirements: ['id' => '\d+'])]
++    public function lu(int $id, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
++    {
++        $notification = $this->notificationRepository->find($id);
++        if (!$notification) {
++            return $this->json(['error' => 'Notification non trouvée'], 404);
++        }
++        if ($notification->getUtilisateur() !== $utilisateur) {
++            return $this->json(['error' => 'Accès refusé'], 403);
++        }
++
++        $notification->setStatut(NotificationService::LUE);
++        $this->em->flush();
++
++        return $this->json($this->toArray($notification));
++    }
++
++    private function toArray(Notification $n): array
++    {
++        return [
++            'id' => $n->getId(),
++            'type' => $n->getType(),
++            'message' => $n->getMessage(),
++            'statut' => $n->getStatut(),
++            'lue' => $n->getStatut() === NotificationService::LUE,
++            'date' => $n->getDateEnvoi()?->format(DATE_ATOM),
++        ];
++    }
++}
+diff --git a/src/Controller/RendezVousApiController.php b/src/Controller/RendezVousApiController.php
+index 999aa04..06838cb 100644
+--- a/src/Controller/RendezVousApiController.php
++++ b/src/Controller/RendezVousApiController.php
+@@ -112,7 +112,7 @@ class RendezVousApiController extends AbstractController
+         }
+ 
+         try {
+-            $this->rendezVousService->annuler($rdv);
++            $this->rendezVousService->annuler($rdv, $utilisateur);
+         } catch (\DomainException $e) {
+             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+         }
+diff --git a/src/Repository/NotificationRepository.php b/src/Repository/NotificationRepository.php
+index 459ae9d..18ac31f 100644
+--- a/src/Repository/NotificationRepository.php
++++ b/src/Repository/NotificationRepository.php
+@@ -3,6 +3,8 @@
+ namespace App\Repository;
+ 
+ use App\Entity\Notification;
++use App\Entity\Utilisateur;
++use App\Service\NotificationService;
+ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+ use Doctrine\Persistence\ManagerRegistry;
+ 
+@@ -16,6 +18,44 @@ class NotificationRepository extends ServiceEntityRepository
+         parent::__construct($registry, Notification::class);
+     }
+ 
++    /** @return Notification[] les plus récentes d'abord */
++    public function pourUtilisateur(Utilisateur $utilisateur, bool $nonLuesSeulement = false, int $limite = 50): array
++    {
++        $qb = $this->createQueryBuilder('n')
++            ->andWhere('n.utilisateur = :u')->setParameter('u', $utilisateur)
++            ->andWhere('n.canal = :canal')->setParameter('canal', NotificationService::CANAL_APP)
++            ->orderBy('n.dateEnvoi', 'DESC')
++            ->addOrderBy('n.id', 'DESC')
++            ->setMaxResults($limite);
++        if ($nonLuesSeulement) {
++            $qb->andWhere('n.statut = :statut')->setParameter('statut', NotificationService::NON_LUE);
++        }
++
++        return $qb->getQuery()->getResult();
++    }
++
++    public function compterNonLues(Utilisateur $utilisateur): int
++    {
++        return (int) $this->createQueryBuilder('n')
++            ->select('COUNT(n.id)')
++            ->andWhere('n.utilisateur = :u')->setParameter('u', $utilisateur)
++            ->andWhere('n.canal = :canal')->setParameter('canal', NotificationService::CANAL_APP)
++            ->andWhere('n.statut = :statut')->setParameter('statut', NotificationService::NON_LUE)
++            ->getQuery()->getSingleScalarResult();
++    }
++
++    /** @return int nombre de notifications passées à "lue" */
++    public function toutMarquerLu(Utilisateur $utilisateur): int
++    {
++        return (int) $this->createQueryBuilder('n')
++            ->update()
++            ->set('n.statut', ':lue')->setParameter('lue', NotificationService::LUE)
++            ->where('n.utilisateur = :u')->setParameter('u', $utilisateur)
++            ->andWhere('n.canal = :canal')->setParameter('canal', NotificationService::CANAL_APP)
++            ->andWhere('n.statut = :nonLue')->setParameter('nonLue', NotificationService::NON_LUE)
++            ->getQuery()->execute();
++    }
++
+ //    /**
+ //     * @return Notification[] Returns an array of Notification objects
+ //     */
+diff --git a/src/Repository/UtilisateurRepository.php b/src/Repository/UtilisateurRepository.php
+index df1e4c6..096715f 100644
+--- a/src/Repository/UtilisateurRepository.php
++++ b/src/Repository/UtilisateurRepository.php
+@@ -2,6 +2,7 @@
+ 
+ namespace App\Repository;
+ 
++use App\Entity\Service;
+ use App\Entity\Utilisateur;
+ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+ use Doctrine\Persistence\ManagerRegistry;
+@@ -16,6 +17,16 @@ class UtilisateurRepository extends ServiceEntityRepository
+         parent::__construct($registry, Utilisateur::class);
+     }
+ 
++    /** @return Utilisateur[] les agents (rôle "agent") rattachés à ce service */
++    public function findAgentsDuService(Service $service): array
++    {
++        return $this->createQueryBuilder('u')
++            ->join('u.role', 'r')
++            ->andWhere('u.service = :service')->setParameter('service', $service)
++            ->andWhere('r.nom = :role')->setParameter('role', 'agent')
++            ->getQuery()->getResult();
++    }
++
+ //    /**
+ //     * @return Utilisateur[] Returns an array of Utilisateur objects
+ //     */
+diff --git a/src/Service/NotificationService.php b/src/Service/NotificationService.php
+new file mode 100644
+index 0000000..f0ed626
+--- /dev/null
++++ b/src/Service/NotificationService.php
+@@ -0,0 +1,125 @@
++<?php
++
++namespace App\Service;
++
++use App\Entity\Notification;
++use App\Entity\RendezVous;
++use App\Entity\Utilisateur;
++use App\Repository\UtilisateurRepository;
++use Doctrine\ORM\EntityManagerInterface;
++use Psr\Log\LoggerInterface;
++use Symfony\Component\DependencyInjection\Attribute\Autowire;
++use Symfony\Component\Mailer\MailerInterface;
++use Symfony\Component\Mime\Email;
++
++/**
++ * Notifications : une ligne en base (canal "app", lue / non lue) + un e-mail.
++ * L'envoi d'e-mail ne doit jamais faire échouer l'action métier : en cas
++ * d'erreur elle est seulement écrite dans le log.
++ *
++ * Les lignes créées ici sont seulement persistées : l'appelant fait le flush.
++ */
++class NotificationService
++{
++    public const CANAL_APP = 'app';
++    public const NON_LUE = 'non_lue';
++    public const LUE = 'lue';
++
++    public function __construct(
++        private EntityManagerInterface $em,
++        private MailerInterface $mailer,
++        private UtilisateurRepository $utilisateurRepository,
++        private LoggerInterface $logger,
++        #[Autowire(env: 'MAILER_FROM')]
++        private string $expediteur,
++    ) {
++    }
++
++    public function notifier(Utilisateur $destinataire, string $type, string $sujet, string $message): Notification
++    {
++        $notification = new Notification();
++        $notification->setType($type);
++        $notification->setCanal(self::CANAL_APP);
++        $notification->setMessage($message);
++        $notification->setStatut(self::NON_LUE);
++        $notification->setDateEnvoi(new \DateTimeImmutable());
++        $notification->setUtilisateur($destinataire);
++        $this->em->persist($notification);
++
++        $this->envoyerEmail($destinataire, $sujet, $message);
++
++        return $notification;
++    }
++
++    /**
++     * Événements d'un rendez-vous : reserve, confirme, refuse, annule.
++     * $par = l'utilisateur qui a agi (sert à savoir qui prévenir en cas d'annulation).
++     */
++    public function notifierRendezVous(RendezVous $rdv, string $evenement, ?Utilisateur $par = null): void
++    {
++        $citoyen = $rdv->getDemande()?->getUtilisateur();
++        $creneau = $rdv->getCreneau();
++        $service = $creneau?->getService();
++        if (!$citoyen || !$creneau) {
++            return;
++        }
++
++        $quand = sprintf('du %s à %s', $creneau->getDate()?->format('d/m/Y'), $creneau->getHeure());
++        $lieu = $service?->getNom() ?? 'le service';
++        $agents = $service ? $this->utilisateurRepository->findAgentsDuService($service) : [];
++        $nomCitoyen = trim($citoyen->getPrenom() . ' ' . $citoyen->getNom());
++
++        switch ($evenement) {
++            case 'reserve':
++                $this->notifier($citoyen, 'rdv_en_attente', 'Demande de rendez-vous enregistrée',
++                    "Votre demande de rendez-vous $quand ($lieu) est enregistrée. Un agent doit la confirmer.");
++                foreach ($agents as $agent) {
++                    $this->notifier($agent, 'rdv_a_valider', 'Nouveau rendez-vous à valider',
++                        "$nomCitoyen demande un rendez-vous $quand. À confirmer ou refuser.");
++                }
++                break;
++
++            case 'confirme':
++                $this->notifier($citoyen, 'rdv_confirme', 'Rendez-vous confirmé',
++                    "Votre rendez-vous $quand ($lieu) est confirmé.");
++                break;
++
++            case 'refuse':
++                $this->notifier($citoyen, 'rdv_refuse', 'Rendez-vous refusé',
++                    "Votre rendez-vous $quand ($lieu) a été refusé. Vous pouvez choisir un autre créneau.");
++                break;
++
++            case 'annule':
++                if ($par !== null && $par->getId() === $citoyen->getId()) {
++                    // Le citoyen annule : on prévient les agents du service.
++                    foreach ($agents as $agent) {
++                        $this->notifier($agent, 'rdv_annule', 'Rendez-vous annulé',
++                            "$nomCitoyen a annulé son rendez-vous $quand.");
++                    }
++                } else {
++                    // L'agent (ou l'admin) annule : on prévient le citoyen.
++                    $this->notifier($citoyen, 'rdv_annule', 'Rendez-vous annulé',
++                        "Votre rendez-vous $quand ($lieu) a été annulé par le service. Vous pouvez choisir un autre créneau.");
++                }
++                break;
++        }
++    }
++
++    private function envoyerEmail(Utilisateur $destinataire, string $sujet, string $message): void
++    {
++        if (!$destinataire->getEmail()) {
++            return;
++        }
++        try {
++            $this->mailer->send(
++                (new Email())
++                    ->from($this->expediteur)
++                    ->to($destinataire->getEmail())
++                    ->subject('[Orient-Admin] ' . $sujet)
++                    ->text($message)
++            );
++        } catch (\Throwable $e) {
++            $this->logger->error('Envoi e-mail impossible : ' . $e->getMessage(), ['destinataire' => $destinataire->getEmail()]);
++        }
++    }
++}
+diff --git a/src/Service/RendezVousService.php b/src/Service/RendezVousService.php
+index c383ae1..2457b30 100644
+--- a/src/Service/RendezVousService.php
++++ b/src/Service/RendezVousService.php
+@@ -6,6 +6,7 @@ use App\Entity\Creneau;
+ use App\Entity\Demande;
+ use App\Entity\HistoriqueStatut;
+ use App\Entity\RendezVous;
++use App\Entity\Utilisateur;
+ use App\Repository\RendezVousRepository;
+ use Doctrine\DBAL\LockMode;
+ use Doctrine\ORM\EntityManagerInterface;
+@@ -24,6 +25,7 @@ class RendezVousService
+     public function __construct(
+         private EntityManagerInterface $em,
+         private RendezVousRepository $rendezVousRepository,
++        private NotificationService $notifications,
+     ) {
+     }
+ 
+@@ -42,7 +44,7 @@ class RendezVousService
+ 
+         // Transaction + verrou sur le créneau : deux citoyens ne peuvent pas
+         // réserver le même créneau en même temps.
+-        return $this->em->wrapInTransaction(function () use ($demande, $creneauId, $service) {
++        $rdv = $this->em->wrapInTransaction(function () use ($demande, $creneauId, $service) {
+             $creneau = $this->em->find(Creneau::class, $creneauId, LockMode::PESSIMISTIC_WRITE);
+             if (!$creneau) {
+                 throw new \DomainException('Créneau introuvable', 404);
+@@ -70,6 +72,11 @@ class RendezVousService
+ 
+             return $rdv;
+         });
++
++        $this->notifications->notifierRendezVous($rdv, 'reserve');
++        $this->em->flush();
++
++        return $rdv;
+     }
+ 
+     /** Agent : valide un rendez-vous en attente. */
+@@ -80,6 +87,9 @@ class RendezVousService
+         }
+         $rdv->setStatut('confirme');
+         $this->em->flush();
++
++        $this->notifications->notifierRendezVous($rdv, 'confirme');
++        $this->em->flush();
+     }
+ 
+     /** Agent : refuse un rendez-vous en attente ; le créneau est libéré. */
+@@ -92,15 +102,15 @@ class RendezVousService
+     }
+ 
+     /** Citoyen ou agent : annule un rendez-vous en attente ou confirmé. */
+-    public function annuler(RendezVous $rdv): void
++    public function annuler(RendezVous $rdv, ?Utilisateur $par = null): void
+     {
+         if (!in_array($rdv->getStatut(), ['en_attente', 'confirme'], true)) {
+             throw new \DomainException('Ce rendez-vous ne peut plus être annulé', 409);
+         }
+-        $this->liberer($rdv, 'annule');
++        $this->liberer($rdv, 'annule', $par);
+     }
+ 
+-    private function liberer(RendezVous $rdv, string $statutFinal): void
++    private function liberer(RendezVous $rdv, string $statutFinal, ?Utilisateur $par = null): void
+     {
+         $rdv->setStatut($statutFinal);
+         $rdv->getCreneau()?->setDisponible(true);
+@@ -112,6 +122,9 @@ class RendezVousService
+         }
+ 
+         $this->em->flush();
++
++        $this->notifications->notifierRendezVous($rdv, $statutFinal, $par);
++        $this->em->flush();
+     }
+ 
+     private function ajouterHistorique(Demande $demande, string $statut): void

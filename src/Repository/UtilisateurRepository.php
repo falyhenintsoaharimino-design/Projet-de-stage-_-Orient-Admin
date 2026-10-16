@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Service;
 use App\Entity\Utilisateur;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -14,6 +15,16 @@ class UtilisateurRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Utilisateur::class);
+    }
+
+    /** @return Utilisateur[] les agents (rôle "agent") rattachés à ce service */
+    public function findAgentsDuService(Service $service): array
+    {
+        return $this->createQueryBuilder('u')
+            ->join('u.role', 'r')
+            ->andWhere('u.service = :service')->setParameter('service', $service)
+            ->andWhere('r.nom = :role')->setParameter('role', 'agent')
+            ->getQuery()->getResult();
     }
 
 //    /**

@@ -6,6 +6,7 @@ use App\Entity\Creneau;
 use App\Entity\Demande;
 use App\Entity\HistoriqueStatut;
 use App\Entity\RendezVous;
+use App\Entity\Utilisateur;
 use App\Repository\RendezVousRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,6 +25,7 @@ class RendezVousService
     public function __construct(
         private EntityManagerInterface $em,
         private RendezVousRepository $rendezVousRepository,
+        private NotificationService $notifications,
     ) {
     }
 
@@ -42,7 +44,7 @@ class RendezVousService
 
         // Transaction + verrou sur le créneau : deux citoyens ne peuvent pas
         // réserver le même créneau en même temps.
-        return $this->em->wrapInTransaction(function () use ($demande, $creneauId, $service) {
+        $rdv = $this->em->wrapInTransaction(function () use ($demande, $creneauId, $service) {
             $creneau = $this->em->find(Creneau::class, $creneauId, LockMode::PESSIMISTIC_WRITE);
             if (!$creneau) {
                 throw new \DomainException('Créneau introuvable', 404);
@@ -70,6 +72,11 @@ class RendezVousService
 
             return $rdv;
         });
+
+        $this->notifications->notifierRendezVous($rdv, 'reserve');
+        $this->em->flush();
+
+        return $rdv;
     }
 
     /** Agent : valide un rendez-vous en attente. */
@@ -79,6 +86,9 @@ class RendezVousService
             throw new \DomainException('Seul un rendez-vous en attente peut être confirmé', 409);
         }
         $rdv->setStatut('confirme');
+        $this->em->flush();
+
+        $this->notifications->notifierRendezVous($rdv, 'confirme');
         $this->em->flush();
     }
 
@@ -92,15 +102,15 @@ class RendezVousService
     }
 
     /** Citoyen ou agent : annule un rendez-vous en attente ou confirmé. */
-    public function annuler(RendezVous $rdv): void
+    public function annuler(RendezVous $rdv, ?Utilisateur $par = null): void
     {
         if (!in_array($rdv->getStatut(), ['en_attente', 'confirme'], true)) {
             throw new \DomainException('Ce rendez-vous ne peut plus être annulé', 409);
         }
-        $this->liberer($rdv, 'annule');
+        $this->liberer($rdv, 'annule', $par);
     }
 
-    private function liberer(RendezVous $rdv, string $statutFinal): void
+    private function liberer(RendezVous $rdv, string $statutFinal, ?Utilisateur $par = null): void
     {
         $rdv->setStatut($statutFinal);
         $rdv->getCreneau()?->setDisponible(true);
@@ -111,6 +121,9 @@ class RendezVousService
             $this->ajouterHistorique($demande, 'orientee');
         }
 
+        $this->em->flush();
+
+        $this->notifications->notifierRendezVous($rdv, $statutFinal, $par);
         $this->em->flush();
     }
 

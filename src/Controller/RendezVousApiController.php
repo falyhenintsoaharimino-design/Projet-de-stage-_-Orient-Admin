@@ -112,7 +112,7 @@ class RendezVousApiController extends AbstractController
         }
 
         try {
-            $this->rendezVousService->annuler($rdv);
+            $this->rendezVousService->annuler($rdv, $utilisateur);
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
