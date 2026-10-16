@@ -7,6 +7,8 @@
 
   var api = window.OrientAdmin.api;
   var root = document.body.dataset.root || "./";
+  // Le HTML est "visiteur" : le vrai rôle vient de la session.
+  var espace = api && api.isLoggedIn() ? api.roleEspace(api.getUser()) : null;
   var conteneur = document.getElementById("fiche-service");
   if (!conteneur || !api) { return; }
 
@@ -27,10 +29,18 @@
         }).join("") + "</ul>"
       : "<p class=\"text-muted\">Aucune procédure enregistrée pour ce service pour le moment.</p>";
 
+    var actionRdv = "";
+    if (espace === "citoyen") {
+      actionRdv = '<button class="btn btn--primary" type="button" id="btn-rdv">Prendre rendez-vous</button>';
+    } else if (!espace) {
+      actionRdv = '<a class="btn btn--primary" href="' + root + 'pages/auth/connexion.html">Se connecter pour prendre rendez-vous</a>';
+    }
+
     conteneur.innerHTML =
       '<header class="page-head"><div><h1>' + escapeHtml(service.nom) + '</h1>' +
       (service.categorie ? '<p class="text-muted">' + escapeHtml(service.categorie) + '</p>' : '') +
-      '</div></header>' +
+      '<p class="text-small text-danger" id="erreur-rdv" hidden></p>' +
+      '</div><div class="page-head__actions">' + actionRdv + '</div></header>' +
       '<div class="grid grid--main-aside">' +
       '<div class="card"><h3>Missions</h3><p class="text-muted">' + escapeHtml(service.mission || 'Non renseigné.') + '</p>' +
       '<h3 class="mt-5">Procédures liées</h3>' + procHtml + '</div>' +
@@ -39,6 +49,21 @@
       '<dt>Horaires</dt><dd>' + escapeHtml(service.horaires || 'Non renseignés') + '</dd>' +
       '<dt>Contact</dt><dd>' + escapeHtml(service.contact || 'Non renseigné') + '</dd>' +
       '</dl></div></div>';
+    var bouton = document.getElementById("btn-rdv");
+    if (bouton) {
+      bouton.addEventListener("click", function () {
+        bouton.disabled = true;
+        // Demande créée directement vers ce service, puis choix du créneau.
+        api.creerDemande("Rendez-vous : " + service.nom, service.id).then(function (demande) {
+          window.location.href = root + "pages/citoyen/prendre-rendez-vous.html?demandeId=" + demande.id;
+        }).catch(function (err) {
+          var zone = document.getElementById("erreur-rdv");
+          zone.textContent = err.message || "Impossible de créer la demande pour le moment.";
+          zone.hidden = false;
+          bouton.disabled = false;
+        });
+      });
+    }
   }).catch(function () {
     conteneur.innerHTML = "<p class=\"text-muted\">Ce service est introuvable ou n'est plus disponible.</p>";
   });
