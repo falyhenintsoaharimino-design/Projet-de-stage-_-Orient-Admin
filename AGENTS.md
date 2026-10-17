@@ -1,5 +1,70 @@
 # AGENTS.md
 
+## Projet Orient-Admin : contexte, règles et avancement
+
+Projet de licence : système intelligent d'orientation des citoyens vers les
+services administratifs (API Symfony + frontend HTML/CSS/JS servi depuis
+`public/`, puis application mobile Flutter). Les questions de la section
+« Ask before generating » ont déjà leur réponse : Doctrine ORM + PostgreSQL,
+API JSON (pas de Twig), SecurityBundle avec JWT Lexik. Ne pas les reposer.
+
+### Documents de référence
+
+Dossier `.document de references/` (point au début et espaces dans le nom :
+mettre le chemin entre guillemets) :
+`Cahier_des_charges_orientation_citoyens.md` (provisoire, sera refait),
+`Guide_projet_orientation_citoyens.md`, `projet_3_licence.md` (sujet),
+`repartition-taches-projet-orientation.md`. À lire avant toute étape
+fonctionnelle ; ne pas les relire en entier à chaque fois.
+
+### Méthode de travail (voir aussi CLAUDE.md)
+
+- Réponses en français, changements minimaux et ciblés, pas de réécriture complète.
+- Claude ne peut pas lancer la base : il livre un patch (`git apply`) et un script
+  de recette `scripts/smoke-XXX.sh` (curl, affiche OK / ÉCHEC) lancé par l'étudiant.
+- Vérification uniquement en ligne de commande ; le front sera refait une fois le
+  backend opérationnel.
+- Chaque étape se termine par : `doctrine:schema:validate` OK, commit, push.
+- Schéma : migrations uniquement (jamais `doctrine:schema:update`).
+
+### Conventions du code
+
+- Erreurs métier : `\DomainException` dont le code est le statut HTTP ; le contrôleur
+  la convertit en réponse JSON `{"error": ...}`.
+- Rôles : `ROLE_CITOYEN`, `ROLE_AGENT`, `ROLE_RESPONSABLE`, `ROLE_ADMIN` ;
+  l'admin hérite des trois autres (`role_hierarchy`). Un agent est rattaché à un `Service`.
+- Services réutilisables : `NotificationService::notifier($utilisateur, $type, $sujet, $message)`
+  (ligne en base + e-mail asynchrone), `JournalService::enregistrer($action, ?$utilisateur, ?$details)`
+  (audit, n'échoue jamais l'action métier), `RendezVousService`, `AvisService`, `OrientationEngine`.
+- Toute action sensible est journalisée via `JournalService` (noms d'actions en
+  minuscules avec `_`, ex. `rdv_confirme`).
+- Windows est insensible à la casse mais pas Linux : les types d'entités doivent
+  respecter la casse (`?Service`, `?Utilisateur`...).
+- Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
+  agent@test.com (service 1), admin@test.com, responsable@test.com.
+
+### Avancement (mis à jour le 17/10/2026)
+
+Fait, testé et poussé :
+- 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
+- Créneaux et rendez-vous (statuts : en_attente, confirme, refuse, annule, termine, absent)
+- Étape 1 Notifications (`scripts/smoke.sh`)
+- Étape 2 Avis (`scripts/smoke-avis.sh`)
+- Étape 3 Journal d'audit, créneaux inclus (`scripts/smoke-journal.sh`) :
+  `GET /api/journal` (admin ; filtres action, utilisateurId, du, au ; pagination) et `GET /api/journal/actions`
+
+Reste à faire, dans cet ordre :
+4. Gestion admin (utilisateurs, rôles) + mot de passe oublié (lien signé)
+5. Statistiques + dashboard responsable + export CSV
+6. Moteur d'orientation (non bloquant)
+7. Tests des accès par rôle (PHPUnit) + OpenAPI
+8. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
+   responsable/*, admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
+   agent/demandes, prendre-rendez-vous, mes-rendez-vous, agent/rendez-vous, catalogue)
+9. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
+
+Mettre cette section à jour à la fin de chaque étape, dans le même commit.
+
 This is a Symfony project. Check `composer.json` for the exact Symfony/PHP version
 in use, and read `symfony.lock` to see which recipes ran. Don't assume Doctrine,
 Twig, API Platform, Messenger, or Lock are installed unless one of those says so.
