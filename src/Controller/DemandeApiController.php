@@ -7,6 +7,7 @@ use App\Entity\HistoriqueStatut;
 use App\Entity\Utilisateur;
 use App\Repository\DemandeRepository;
 use App\Repository\ServiceRepository;
+use App\Service\JournalService;
 use App\Service\OrientationEngine;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,6 +35,7 @@ class DemandeApiController extends AbstractController
         private DemandeRepository $demandeRepository,
         private ServiceRepository $serviceRepository,
         private OrientationEngine $orientationEngine,
+        private JournalService $journal,
     ) {
     }
 
@@ -81,6 +83,7 @@ class DemandeApiController extends AbstractController
         $this->em->persist($demande);
         $this->em->persist($historique);
         $this->em->flush();
+        $this->journal->enregistrer('demande_creee', $utilisateur, sprintf('demande=%d statut=%s', $demande->getId(), $demande->getStatus()));
 
         return $this->json($this->toArray($demande, $resultat['alternatives']), 201);
     }
@@ -138,7 +141,7 @@ class DemandeApiController extends AbstractController
      */
     #[Route('/{id}/reorienter', name: 'api_demandes_reorienter', methods: ['PATCH'])]
     #[IsGranted('ROLE_AGENT')]
-    public function reorienter(int $id, Request $request): JsonResponse
+    public function reorienter(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
         $demande = $this->demandeRepository->find($id);
         if (!$demande) {
@@ -161,6 +164,7 @@ class DemandeApiController extends AbstractController
         $this->ajouterHistorique($demande, 'orientee');
 
         $this->em->flush();
+        $this->journal->enregistrer('demande_reorientee', $utilisateur, sprintf('demande=%d service=%d', $demande->getId(), $service->getId()));
 
         return $this->json($this->toArray($demande, inclureHistorique: true));
     }
@@ -171,7 +175,7 @@ class DemandeApiController extends AbstractController
      */
     #[Route('/{id}/statut', name: 'api_demandes_statut', methods: ['PATCH'])]
     #[IsGranted('ROLE_AGENT')]
-    public function changerStatut(int $id, Request $request): JsonResponse
+    public function changerStatut(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
         $demande = $this->demandeRepository->find($id);
         if (!$demande) {
@@ -190,6 +194,7 @@ class DemandeApiController extends AbstractController
         $this->ajouterHistorique($demande, $statut);
 
         $this->em->flush();
+        $this->journal->enregistrer('demande_statut', $utilisateur, sprintf('demande=%d statut=%s', $demande->getId(), $statut));
 
         return $this->json($this->toArray($demande, inclureHistorique: true));
     }

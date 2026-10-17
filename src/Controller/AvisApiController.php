@@ -8,6 +8,7 @@ use App\Repository\AvisRepository;
 use App\Repository\RendezVousRepository;
 use App\Repository\ServiceRepository;
 use App\Service\AvisService;
+use App\Service\JournalService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,6 +29,7 @@ class AvisApiController extends AbstractController
         private RendezVousRepository $rendezVousRepository,
         private ServiceRepository $serviceRepository,
         private AvisService $avisService,
+        private JournalService $journal,
     ) {
     }
 
@@ -52,6 +54,8 @@ class AvisApiController extends AbstractController
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
+
+        $this->journal->enregistrer('avis_donne', $utilisateur, sprintf('avis=%d rdv=%d note=%d', $avis->getId(), $rdv->getId(), $avis->getNote()));
 
         return $this->json($this->toArray($avis), 201);
     }

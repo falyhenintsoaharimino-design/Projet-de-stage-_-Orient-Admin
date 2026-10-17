@@ -3,9 +3,11 @@
 namespace App\Entity;
 
 use App\Repository\JournalRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: JournalRepository::class)]
+#[ORM\Index(name: 'idx_journal_date', columns: ['date'])]
 class Journal
 {
     #[ORM\Id]
@@ -22,8 +24,11 @@ class Journal
     #[ORM\Column(length: 50)]
     private ?string $adresseIp = null;
 
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $details = null;
+
     #[ORM\ManyToOne]
-    private ?utilisateur $utilisateur = null;
+    private ?Utilisateur $utilisateur = null;
 
     public function getId(): ?int
     {
@@ -66,12 +71,24 @@ class Journal
         return $this;
     }
 
-    public function getUtilisateur(): ?utilisateur
+    public function getDetails(): ?string
+    {
+        return $this->details;
+    }
+
+    public function setDetails(?string $details): static
+    {
+        $this->details = $details;
+
+        return $this;
+    }
+
+    public function getUtilisateur(): ?Utilisateur
     {
         return $this->utilisateur;
     }
 
-    public function setUtilisateur(?utilisateur $utilisateur): static
+    public function setUtilisateur(?Utilisateur $utilisateur): static
     {
         $this->utilisateur = $utilisateur;
 

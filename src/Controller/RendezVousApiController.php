@@ -6,6 +6,7 @@ use App\Entity\RendezVous;
 use App\Entity\Utilisateur;
 use App\Repository\DemandeRepository;
 use App\Repository\RendezVousRepository;
+use App\Service\JournalService;
 use App\Service\NotificationService;
 use App\Service\RendezVousService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ class RendezVousApiController extends AbstractController
         private DemandeRepository $demandeRepository,
         private RendezVousService $rendezVousService,
         private NotificationService $notifications,
+        private JournalService $journal,
     ) {
     }
 
@@ -60,6 +62,8 @@ class RendezVousApiController extends AbstractController
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
+
+        $this->journaliser('rdv_reserve', $utilisateur, $rdv);
 
         return $this->json($this->toArray($rdv), 201);
     }
@@ -119,6 +123,8 @@ class RendezVousApiController extends AbstractController
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
 
+        $this->journaliser('rdv_annule', $utilisateur, $rdv);
+
         return $this->json($this->toArray($rdv));
     }
 
@@ -148,6 +154,8 @@ class RendezVousApiController extends AbstractController
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
+
+        $this->journaliser($decision === 'confirmer' ? 'rdv_confirme' : 'rdv_refuse', $utilisateur, $rdv);
 
         return $this->json($this->toArray($rdv));
     }
@@ -180,8 +188,14 @@ class RendezVousApiController extends AbstractController
             $this->notifications->notifierRendezVous($rdv, 'termine');
         }
         $this->em->flush();
+        $this->journaliser('rdv_' . $statut, $utilisateur, $rdv);
 
         return $this->json($this->toArray($rdv));
+    }
+
+    private function journaliser(string $action, Utilisateur $utilisateur, RendezVous $rdv): void
+    {
+        $this->journal->enregistrer($action, $utilisateur, sprintf('rdv=%d demande=%d', $rdv->getId(), $rdv->getDemande()?->getId() ?? 0));
     }
 
     /** $lecture = true : admin/responsable inclus ; false : actions d'écriture. */

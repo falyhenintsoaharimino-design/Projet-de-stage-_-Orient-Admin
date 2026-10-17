@@ -1,0 +1,759 @@
+diff --git a/migrations/Version20261017200000.php b/migrations/Version20261017200000.php
+new file mode 100644
+index 0000000..6d004d2
+--- /dev/null
++++ b/migrations/Version20261017200000.php
+@@ -0,0 +1,32 @@
++<?php
++
++declare(strict_types=1);
++
++namespace DoctrineMigrations;
++
++use Doctrine\DBAL\Schema\Schema;
++use Doctrine\Migrations\AbstractMigration;
++
++/**
++ * Journal d'audit : ajoute le détail de l'action (texte libre, facultatif)
++ * et un index sur la date (consultation triée / filtrée par période).
++ */
++final class Version20261017200000 extends AbstractMigration
++{
++    public function getDescription(): string
++    {
++        return 'journal : colonne details + index sur la date';
++    }
++
++    public function up(Schema $schema): void
++    {
++        $this->addSql('ALTER TABLE journal ADD details TEXT DEFAULT NULL');
++        $this->addSql('CREATE INDEX idx_journal_date ON journal (date)');
++    }
++
++    public function down(Schema $schema): void
++    {
++        $this->addSql('DROP INDEX idx_journal_date');
++        $this->addSql('ALTER TABLE journal DROP details');
++    }
++}
+diff --git a/scripts/smoke-journal.sh b/scripts/smoke-journal.sh
+new file mode 100755
+index 0000000..b835bda
+--- /dev/null
++++ b/scripts/smoke-journal.sh
+@@ -0,0 +1,172 @@
++#!/usr/bin/env bash
++# Recette du journal d'audit (étape 3 du backend).
++# Usage : bash scripts/smoke-journal.sh            (serveur sur http://127.0.0.1:8000)
++#         SERVICE_ID=2 bash scripts/smoke-journal.sh   (si l'agent n'est pas sur le service 1)
++# Prérequis : migration appliquée (php bin/console doctrine:migrations:migrate),
++#             symfony serve lancé, comptes de test créés, php dans le PATH.
++# Laisse quelques créneaux/demandes/rendez-vous/avis/comptes de test dans la base (sans danger).
++
++BASE="${1:-http://127.0.0.1:8000}"
++SERVICE_ID="${SERVICE_ID:-1}"
++PASS="motdepasse123"
++NB_OK=0; NB_KO=0
++
++ok()  { echo "OK      $1"; NB_OK=$((NB_OK+1)); }
++ko()  { echo "ÉCHEC   $1  ->  $2"; NB_KO=$((NB_KO+1)); }
++code_attendu() { [ "$CODE" = "$2" ] && ok "$1" || ko "$1" "code $CODE (attendu $2) $BODY"; }
++egal() { [ "$2" = "$3" ] && ok "$1" || ko "$1" "obtenu '$2', attendu '$3'"; }
++
++jget() {
++  printf '%s' "$1" | php -r '$d=json_decode(stream_get_contents(STDIN),true);
++    foreach (explode(".", $argv[1]) as $k) { if (!is_array($d) || !array_key_exists($k, $d)) { exit(0); } $d = $d[$k]; }
++    echo is_bool($d) ? ($d ? "true" : "false") : (is_scalar($d) ? $d : json_encode($d));' -- "$2"
++}
++
++api() {
++  local args=(-s -X "$1" "$BASE$2" -H 'Content-Type: application/json' -w $'\n%{http_code}')
++  [ -n "$3" ] && args+=(-H "Authorization: Bearer $3")
++  [ -n "$4" ] && args+=(-d "$4")
++  local out; out=$(curl "${args[@]}")
++  CODE="${out##*$'\n'}"; BODY="${out%$'\n'*}"
++}
++
++login() { api POST /api/login_check "" "{\"email\":\"$1\",\"password\":\"$PASS\"}"; jget "$BODY" token; }
++# nb ACTION : nombre d'entrées du journal pour cette action (lu avec le jeton admin)
++nb() { api GET "/api/journal?action=$1&limite=1" "$ADM"; jget "$BODY" total; }
++# delta ACTION AVANT ATTENDU LIBELLÉ
++delta() { local apres; apres=$(nb "$1"); egal "$4" "$((apres - $2))" "$3"; }
++
++echo "== Connexion =="
++CIT=$(login test@test.com);        [ -n "$CIT" ] && ok "login citoyen"     || ko "login citoyen" "$BODY"
++AGT=$(login agent@test.com);       [ -n "$AGT" ] && ok "login agent"       || ko "login agent" "$BODY"
++ADM=$(login admin@test.com);       [ -n "$ADM" ] && ok "login admin"       || ko "login admin" "$BODY"
++RESP=$(login responsable@test.com);[ -n "$RESP" ] && ok "login responsable" || ko "login responsable" "$BODY"
++[ -z "$CIT" ] || [ -z "$AGT" ] || [ -z "$ADM" ] || [ -z "$RESP" ] && { echo "Impossible de continuer sans jetons."; exit 1; }
++
++echo "== 1. Accès réservé à l'admin =="
++api GET /api/journal "";            code_attendu "sans jeton -> 401" 401
++api GET /api/journal "$CIT";        code_attendu "citoyen -> 403" 403
++api GET /api/journal "$AGT";        code_attendu "agent -> 403" 403
++api GET /api/journal "$RESP";       code_attendu "responsable -> 403" 403
++api GET /api/journal "$ADM";        code_attendu "admin -> 200" 200
++api GET /api/journal/actions "$CIT"; code_attendu "actions : citoyen -> 403" 403
++api GET /api/journal/actions "$ADM"; code_attendu "actions : admin -> 200" 200
++
++echo "== 2. Validation des filtres =="
++api GET "/api/journal?page=0" "$ADM";             code_attendu "page=0 -> 400" 400
++api GET "/api/journal?page=abc" "$ADM";           code_attendu "page=abc -> 400" 400
++api GET "/api/journal?limite=0" "$ADM";           code_attendu "limite=0 -> 400" 400
++api GET "/api/journal?limite=101" "$ADM";         code_attendu "limite=101 -> 400" 400
++api GET "/api/journal?du=2026-13-45" "$ADM";      code_attendu "du invalide -> 400" 400
++api GET "/api/journal?au=demain" "$ADM";          code_attendu "au invalide -> 400" 400
++api GET "/api/journal?utilisateurId=abc" "$ADM";  code_attendu "utilisateurId invalide -> 400" 400
++
++echo "== 3. Mesures de départ =="
++A_CONNEXION=$(nb connexion); A_ECHEC=$(nb connexion_echec); A_INSCR=$(nb inscription)
++A_DCREE=$(nb demande_creee); A_DREO=$(nb demande_reorientee); A_DSTAT=$(nb demande_statut)
++A_RRES=$(nb rdv_reserve); A_RCONF=$(nb rdv_confirme); A_RREF=$(nb rdv_refuse)
++A_RANN=$(nb rdv_annule); A_RTERM=$(nb rdv_termine); A_RABS=$(nb rdv_absent); A_AVIS=$(nb avis_donne)
++[ -n "$A_CONNEXION" ] && ok "compteurs lus (connexion=$A_CONNEXION)" || ko "compteurs" "$BODY"
++
++echo "== 4. Connexions =="
++login test@test.com >/dev/null
++delta connexion "$A_CONNEXION" 1 "une connexion réussie ajoute 1 ligne « connexion »"
++api GET /api/me "$CIT"; code_attendu "requête avec jeton (/api/me)" 200
++api GET /api/me "$CIT"
++delta connexion "$((A_CONNEXION + 1))" 0 "les requêtes avec jeton n'ajoutent rien"
++MAUVAIS="inconnu-$RANDOM@test.com"
++api POST /api/login_check "" "{\"email\":\"$MAUVAIS\",\"password\":\"mauvaisMDP-xyz\"}"; code_attendu "mauvais identifiants -> 401" 401
++delta connexion_echec "$A_ECHEC" 1 "un échec ajoute 1 ligne « connexion_echec »"
++api GET "/api/journal?action=connexion_echec&limite=1" "$ADM"
++egal "échec : l'e-mail saisi est consigné" "$(jget "$BODY" items.0.details)" "email=$MAUVAIS"
++egal "échec : aucun utilisateur rattaché" "$(jget "$BODY" items.0.utilisateur)" "null"
++case "$BODY" in *mauvaisMDP-xyz*) ko "le mot de passe ne doit jamais être journalisé" "présent dans $BODY";; *) ok "le mot de passe n'est pas journalisé";; esac
++
++echo "== 5. Inscription =="
++NOUVEAU="recette-$RANDOM$RANDOM@test.com"
++api POST /api/register "" "{\"nom\":\"Recette\",\"prenom\":\"Journal\",\"email\":\"$NOUVEAU\",\"password\":\"motdepasse123\"}"; code_attendu "inscription" 201
++delta inscription "$A_INSCR" 1 "inscription journalisée"
++api GET "/api/journal?action=inscription&limite=1" "$ADM"
++egal "inscription : rattachée au nouveau compte" "$(jget "$BODY" items.0.utilisateur.email)" "$NOUVEAU"
++
++echo "== 6. Demande, rendez-vous, avis =="
++JOUR=$(date -d "+$((RANDOM % 300 + 5)) days" +%F)
++h() { printf '"%02d:%02d"' $((8 + RANDOM % 10)) $((RANDOM % 60)); }
++api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}"; C1=$(jget "$BODY" crees.0.id)
++api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}"; C2=$(jget "$BODY" crees.0.id)
++[ -n "$C1" ] && [ -n "$C2" ] && ok "2 créneaux créés ($JOUR)" || ko "créneaux" "relance le script (heure déjà prise ?) $BODY"
++api POST /api/demandes "$CIT" "{\"texte\":\"Recette journal\",\"serviceId\":$SERVICE_ID}"
++DEM=$(jget "$BODY" id); [ -n "$DEM" ] && ok "demande $DEM créée" || ko "demande" "$BODY"
++delta demande_creee "$A_DCREE" 1 "demande_creee journalisée"
++api GET "/api/journal?action=demande_creee&limite=1" "$ADM"
++egal "demande_creee : détail" "$(jget "$BODY" items.0.details)" "demande=$DEM statut=orientee"
++
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C1}"; code_attendu "réservation rdv 1" 201
++RDV=$(jget "$BODY" id)
++delta rdv_reserve "$A_RRES" 1 "rdv_reserve journalisé"
++api PATCH "/api/rendez-vous/$RDV/decision" "$AGT" '{"decision":"confirmer"}'; code_attendu "agent confirme" 200
++delta rdv_confirme "$A_RCONF" 1 "rdv_confirme journalisé"
++api PATCH "/api/rendez-vous/$RDV/statut" "$AGT" '{"statut":"termine"}'; code_attendu "agent termine" 200
++delta rdv_termine "$A_RTERM" 1 "rdv_termine journalisé"
++api POST /api/avis "$CIT" "{\"rendezVousId\":$RDV,\"note\":5}"; code_attendu "avis déposé" 201
++delta avis_donne "$A_AVIS" 1 "avis_donne journalisé"
++api POST /api/avis "$CIT" "{\"rendezVousId\":$RDV,\"note\":5}"; code_attendu "2e avis refusé -> 409" 409
++delta avis_donne "$A_AVIS" 1 "un avis refusé n'est pas journalisé"
++
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C2}"; code_attendu "réservation rdv 2" 201
++RDV2=$(jget "$BODY" id)
++api PATCH "/api/rendez-vous/$RDV2/decision" "$AGT" '{"decision":"refuser"}'; code_attendu "agent refuse" 200
++delta rdv_refuse "$A_RREF" 1 "rdv_refuse journalisé"
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C2}"; code_attendu "réservation rdv 3 (créneau libéré)" 201
++RDV3=$(jget "$BODY" id)
++api PATCH "/api/rendez-vous/$RDV3/annuler" "$CIT"; code_attendu "citoyen annule" 200
++delta rdv_annule "$A_RANN" 1 "rdv_annule journalisé"
++api GET "/api/journal?action=rdv_annule&limite=1" "$ADM"
++egal "rdv_annule : détail" "$(jget "$BODY" items.0.details)" "rdv=$RDV3 demande=$DEM"
++egal "rdv_annule : auteur = le citoyen" "$(jget "$BODY" items.0.utilisateur.email)" "test@test.com"
++api PATCH "/api/rendez-vous/$RDV3/annuler" "$CIT"; code_attendu "annulation répétée -> 409" 409
++delta rdv_annule "$A_RANN" 1 "une annulation refusée n'est pas journalisée"
++
++api POST /api/rendez-vous "$CIT" "{\"demandeId\":$DEM,\"creneauId\":$C2}"; code_attendu "réservation rdv 4" 201
++RDV4=$(jget "$BODY" id)
++api PATCH "/api/rendez-vous/$RDV4/decision" "$AGT" '{"decision":"confirmer"}'; code_attendu "agent confirme rdv 4" 200
++api PATCH "/api/rendez-vous/$RDV4/statut" "$AGT" '{"statut":"absent"}'; code_attendu "agent note absent" 200
++delta rdv_absent "$A_RABS" 1 "rdv_absent journalisé"
++
++echo "== 7. Décisions de l'agent sur la demande =="
++api PATCH "/api/demandes/$DEM/reorienter" "$AGT" "{\"serviceId\":$SERVICE_ID}"; code_attendu "agent réoriente" 200
++delta demande_reorientee "$A_DREO" 1 "demande_reorientee journalisée"
++api PATCH "/api/demandes/$DEM/statut" "$AGT" '{"statut":"en_traitement"}'; code_attendu "agent change le statut" 200
++delta demande_statut "$A_DSTAT" 1 "demande_statut journalisé"
++api GET "/api/journal?action=demande_statut&limite=1" "$ADM"
++egal "demande_statut : détail" "$(jget "$BODY" items.0.details)" "demande=$DEM statut=en_traitement"
++egal "demande_statut : auteur = l'agent" "$(jget "$BODY" items.0.utilisateur.email)" "agent@test.com"
++api PATCH "/api/demandes/$DEM/statut" "$AGT" '{"statut":"nimporte"}'; code_attendu "statut invalide -> 400" 400
++delta demande_statut "$A_DSTAT" 1 "un statut invalide n'est pas journalisé"
++
++echo "== 8. Filtres et pagination =="
++AUJ=$(date +%F)
++api GET /api/me "$CIT"; CITID=$(jget "$BODY" id)
++api GET "/api/journal?utilisateurId=$CITID&limite=100" "$ADM"
++TOUS=$(printf '%s' "$BODY" | php -r '$d=json_decode(stream_get_contents(STDIN),true); $ok=!empty($d["items"]); foreach ($d["items"] ?? [] as $i) { if (($i["utilisateur"]["id"] ?? null) != $argv[1]) { $ok=false; } } echo $ok ? "oui" : "non";' -- "$CITID")
++egal "filtre utilisateurId : que des lignes du citoyen" "$TOUS" oui
++api GET "/api/journal?du=$AUJ&au=$AUJ" "$ADM"
++[ "$(jget "$BODY" total)" -ge 1 ] 2>/dev/null && ok "filtre du=au=aujourd'hui : au moins 1 ligne" || ko "filtre du/au aujourd'hui" "$BODY"
++api GET "/api/journal?au=2000-01-01" "$ADM"
++egal "filtre au=2000-01-01 : aucune ligne" "$(jget "$BODY" total)" 0
++api GET "/api/journal?du=2999-01-01" "$ADM"
++egal "filtre du=2999-01-01 : aucune ligne" "$(jget "$BODY" total)" 0
++api GET "/api/journal?limite=2&page=1" "$ADM"
++TOTAL=$(jget "$BODY" total)
++egal "limite=2 : 2 éléments" "$(printf '%s' "$BODY" | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo count($d["items"]);')" 2
++egal "pages = ceil(total/2)" "$(jget "$BODY" pages)" "$(( (TOTAL + 1) / 2 ))"
++D1=$(jget "$BODY" items.0.date); D2=$(jget "$BODY" items.1.date)
++[ ! "$D1" \< "$D2" ] && ok "tri : du plus récent au plus ancien" || ko "tri" "$D1 puis $D2"
++api GET "/api/journal?page=99999" "$ADM"; code_attendu "page hors limites -> 200" 200
++egal "page hors limites : liste vide" "$(printf '%s' "$BODY" | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo count($d["items"]);')" 0
++api GET /api/journal/actions "$ADM"
++case "$BODY" in *rdv_confirme*) ok "liste des actions contient rdv_confirme";; *) ko "liste des actions" "$BODY";; esac
++
++echo
++echo "Résultat : $NB_OK OK, $NB_KO ÉCHEC"
++[ "$NB_KO" = "0" ]
+diff --git a/src/Controller/AuthController.php b/src/Controller/AuthController.php
+index 946772b..cca167e 100644
+--- a/src/Controller/AuthController.php
++++ b/src/Controller/AuthController.php
+@@ -6,6 +6,7 @@ use App\Entity\Role;
+ use App\Entity\Utilisateur;
+ use App\Repository\RoleRepository;
+ use App\Repository\UtilisateurRepository;
++use App\Service\JournalService;
+ use Doctrine\ORM\EntityManagerInterface;
+ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+ use Symfony\Component\HttpFoundation\JsonResponse;
+@@ -27,6 +28,7 @@ class AuthController extends AbstractController
+         private UtilisateurRepository $utilisateurRepository,
+         private RoleRepository $roleRepository,
+         private UserPasswordHasherInterface $passwordHasher,
++        private JournalService $journal,
+     ) {
+     }
+ 
+@@ -69,6 +71,7 @@ class AuthController extends AbstractController
+ 
+         $this->em->persist($utilisateur);
+         $this->em->flush();
++        $this->journal->enregistrer('inscription', $utilisateur);
+ 
+         return $this->json([
+             'id' => $utilisateur->getId(),
+diff --git a/src/Controller/AvisApiController.php b/src/Controller/AvisApiController.php
+index fe25d65..fff6620 100644
+--- a/src/Controller/AvisApiController.php
++++ b/src/Controller/AvisApiController.php
+@@ -8,6 +8,7 @@ use App\Repository\AvisRepository;
+ use App\Repository\RendezVousRepository;
+ use App\Repository\ServiceRepository;
+ use App\Service\AvisService;
++use App\Service\JournalService;
+ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+ use Symfony\Component\HttpFoundation\JsonResponse;
+ use Symfony\Component\HttpFoundation\Request;
+@@ -28,6 +29,7 @@ class AvisApiController extends AbstractController
+         private RendezVousRepository $rendezVousRepository,
+         private ServiceRepository $serviceRepository,
+         private AvisService $avisService,
++        private JournalService $journal,
+     ) {
+     }
+ 
+@@ -53,6 +55,8 @@ class AvisApiController extends AbstractController
+             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+         }
+ 
++        $this->journal->enregistrer('avis_donne', $utilisateur, sprintf('avis=%d rdv=%d note=%d', $avis->getId(), $rdv->getId(), $avis->getNote()));
++
+         return $this->json($this->toArray($avis), 201);
+     }
+ 
+diff --git a/src/Controller/DemandeApiController.php b/src/Controller/DemandeApiController.php
+index e1545db..820f964 100644
+--- a/src/Controller/DemandeApiController.php
++++ b/src/Controller/DemandeApiController.php
+@@ -7,6 +7,7 @@ use App\Entity\HistoriqueStatut;
+ use App\Entity\Utilisateur;
+ use App\Repository\DemandeRepository;
+ use App\Repository\ServiceRepository;
++use App\Service\JournalService;
+ use App\Service\OrientationEngine;
+ use Doctrine\ORM\EntityManagerInterface;
+ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+@@ -34,6 +35,7 @@ class DemandeApiController extends AbstractController
+         private DemandeRepository $demandeRepository,
+         private ServiceRepository $serviceRepository,
+         private OrientationEngine $orientationEngine,
++        private JournalService $journal,
+     ) {
+     }
+ 
+@@ -81,6 +83,7 @@ class DemandeApiController extends AbstractController
+         $this->em->persist($demande);
+         $this->em->persist($historique);
+         $this->em->flush();
++        $this->journal->enregistrer('demande_creee', $utilisateur, sprintf('demande=%d statut=%s', $demande->getId(), $demande->getStatus()));
+ 
+         return $this->json($this->toArray($demande, $resultat['alternatives']), 201);
+     }
+@@ -138,7 +141,7 @@ class DemandeApiController extends AbstractController
+      */
+     #[Route('/{id}/reorienter', name: 'api_demandes_reorienter', methods: ['PATCH'])]
+     #[IsGranted('ROLE_AGENT')]
+-    public function reorienter(int $id, Request $request): JsonResponse
++    public function reorienter(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+     {
+         $demande = $this->demandeRepository->find($id);
+         if (!$demande) {
+@@ -161,6 +164,7 @@ class DemandeApiController extends AbstractController
+         $this->ajouterHistorique($demande, 'orientee');
+ 
+         $this->em->flush();
++        $this->journal->enregistrer('demande_reorientee', $utilisateur, sprintf('demande=%d service=%d', $demande->getId(), $service->getId()));
+ 
+         return $this->json($this->toArray($demande, inclureHistorique: true));
+     }
+@@ -171,7 +175,7 @@ class DemandeApiController extends AbstractController
+      */
+     #[Route('/{id}/statut', name: 'api_demandes_statut', methods: ['PATCH'])]
+     #[IsGranted('ROLE_AGENT')]
+-    public function changerStatut(int $id, Request $request): JsonResponse
++    public function changerStatut(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+     {
+         $demande = $this->demandeRepository->find($id);
+         if (!$demande) {
+@@ -190,6 +194,7 @@ class DemandeApiController extends AbstractController
+         $this->ajouterHistorique($demande, $statut);
+ 
+         $this->em->flush();
++        $this->journal->enregistrer('demande_statut', $utilisateur, sprintf('demande=%d statut=%s', $demande->getId(), $statut));
+ 
+         return $this->json($this->toArray($demande, inclureHistorique: true));
+     }
+diff --git a/src/Controller/JournalApiController.php b/src/Controller/JournalApiController.php
+new file mode 100644
+index 0000000..45f1531
+--- /dev/null
++++ b/src/Controller/JournalApiController.php
+@@ -0,0 +1,117 @@
++<?php
++
++namespace App\Controller;
++
++use App\Entity\Journal;
++use App\Repository\JournalRepository;
++use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
++use Symfony\Component\HttpFoundation\JsonResponse;
++use Symfony\Component\HttpFoundation\Request;
++use Symfony\Component\Routing\Attribute\Route;
++use Symfony\Component\Security\Http\Attribute\IsGranted;
++
++/**
++ * Consultation du journal d'audit, réservée à l'administrateur.
++ * Filtres : ?action=, ?utilisateurId=, ?du=AAAA-MM-JJ, ?au=AAAA-MM-JJ
++ * Pagination : ?page= (défaut 1), ?limite= (défaut 20, maximum 100).
++ */
++#[Route('/api/journal')]
++#[IsGranted('ROLE_ADMIN')]
++class JournalApiController extends AbstractController
++{
++    private const LIMITE_DEFAUT = 20;
++    private const LIMITE_MAX = 100;
++
++    public function __construct(private JournalRepository $journalRepository)
++    {
++    }
++
++    #[Route('', name: 'api_journal_list', methods: ['GET'])]
++    public function list(Request $request): JsonResponse
++    {
++        $page = $this->entierPositif($request->query->get('page'), 1);
++        $limite = $this->entierPositif($request->query->get('limite'), self::LIMITE_DEFAUT);
++        $utilisateurId = $request->query->get('utilisateurId');
++        if ($page === null || $limite === null || $limite > self::LIMITE_MAX) {
++            return $this->json(['error' => sprintf('page et limite doivent être des entiers positifs (limite maximum %d)', self::LIMITE_MAX)], 400);
++        }
++        if ($utilisateurId !== null && $utilisateurId !== '' && $this->entierPositif($utilisateurId, 0) === null) {
++            return $this->json(['error' => 'utilisateurId invalide'], 400);
++        }
++
++        $du = $this->jour($request->query->get('du'));
++        $au = $this->jour($request->query->get('au'));
++        if ($du === false || $au === false) {
++            return $this->json(['error' => 'du / au : format AAAA-MM-JJ attendu'], 400);
++        }
++
++        $action = $request->query->get('action');
++        $resultat = $this->journalRepository->rechercher([
++            'action' => is_string($action) && $action !== '' ? $action : null,
++            'utilisateurId' => ($utilisateurId === null || $utilisateurId === '') ? null : (int) $utilisateurId,
++            'du' => $du,
++            'au' => $au,
++        ], $page, $limite);
++
++        return $this->json([
++            'items' => array_map(fn(Journal $j) => $this->toArray($j), $resultat['items']),
++            'page' => $page,
++            'limite' => $limite,
++            'total' => $resultat['total'],
++            'pages' => max(1, (int) ceil($resultat['total'] / $limite)),
++        ]);
++    }
++
++    /** Liste des actions déjà enregistrées (pour alimenter un filtre). */
++    #[Route('/actions', name: 'api_journal_actions', methods: ['GET'])]
++    public function actions(): JsonResponse
++    {
++        return $this->json($this->journalRepository->actionsConnues());
++    }
++
++    /** Valeur absente -> $defaut ; entier > 0 -> l'entier ; sinon null (invalide). */
++    private function entierPositif(mixed $valeur, int $defaut): ?int
++    {
++        if ($valeur === null || $valeur === '') {
++            return $defaut;
++        }
++        if (!ctype_digit((string) $valeur) || (int) $valeur < 1) {
++            return null;
++        }
++
++        return (int) $valeur;
++    }
++
++    /** null : absent ; DateTimeImmutable : valide ; false : invalide. */
++    private function jour(mixed $valeur): \DateTimeImmutable|false|null
++    {
++        if ($valeur === null || $valeur === '') {
++            return null;
++        }
++        if (!is_string($valeur)) {
++            return false;
++        }
++        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $valeur);
++
++        return ($date && $date->format('Y-m-d') === $valeur) ? $date : false;
++    }
++
++    private function toArray(Journal $j): array
++    {
++        $u = $j->getUtilisateur();
++
++        return [
++            'id' => $j->getId(),
++            'action' => $j->getAction(),
++            'date' => $j->getDate()?->format(DATE_ATOM),
++            'adresseIp' => $j->getAdresseIp(),
++            'details' => $j->getDetails(),
++            'utilisateur' => $u === null ? null : [
++                'id' => $u->getId(),
++                'nom' => $u->getNom(),
++                'prenom' => $u->getPrenom(),
++                'email' => $u->getEmail(),
++            ],
++        ];
++    }
++}
+diff --git a/src/Controller/RendezVousApiController.php b/src/Controller/RendezVousApiController.php
+index 9e12c8e..6acb4c7 100644
+--- a/src/Controller/RendezVousApiController.php
++++ b/src/Controller/RendezVousApiController.php
+@@ -6,6 +6,7 @@ use App\Entity\RendezVous;
+ use App\Entity\Utilisateur;
+ use App\Repository\DemandeRepository;
+ use App\Repository\RendezVousRepository;
++use App\Service\JournalService;
+ use App\Service\NotificationService;
+ use App\Service\RendezVousService;
+ use Doctrine\ORM\EntityManagerInterface;
+@@ -31,6 +32,7 @@ class RendezVousApiController extends AbstractController
+         private DemandeRepository $demandeRepository,
+         private RendezVousService $rendezVousService,
+         private NotificationService $notifications,
++        private JournalService $journal,
+     ) {
+     }
+ 
+@@ -61,6 +63,8 @@ class RendezVousApiController extends AbstractController
+             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+         }
+ 
++        $this->journaliser('rdv_reserve', $utilisateur, $rdv);
++
+         return $this->json($this->toArray($rdv), 201);
+     }
+ 
+@@ -119,6 +123,8 @@ class RendezVousApiController extends AbstractController
+             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+         }
+ 
++        $this->journaliser('rdv_annule', $utilisateur, $rdv);
++
+         return $this->json($this->toArray($rdv));
+     }
+ 
+@@ -149,6 +155,8 @@ class RendezVousApiController extends AbstractController
+             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+         }
+ 
++        $this->journaliser($decision === 'confirmer' ? 'rdv_confirme' : 'rdv_refuse', $utilisateur, $rdv);
++
+         return $this->json($this->toArray($rdv));
+     }
+ 
+@@ -180,10 +188,16 @@ class RendezVousApiController extends AbstractController
+             $this->notifications->notifierRendezVous($rdv, 'termine');
+         }
+         $this->em->flush();
++        $this->journaliser('rdv_' . $statut, $utilisateur, $rdv);
+ 
+         return $this->json($this->toArray($rdv));
+     }
+ 
++    private function journaliser(string $action, Utilisateur $utilisateur, RendezVous $rdv): void
++    {
++        $this->journal->enregistrer($action, $utilisateur, sprintf('rdv=%d demande=%d', $rdv->getId(), $rdv->getDemande()?->getId() ?? 0));
++    }
++
+     /** $lecture = true : admin/responsable inclus ; false : actions d'écriture. */
+     private function peutAcceder(RendezVous $rdv, Utilisateur $utilisateur, bool $lecture): bool
+     {
+diff --git a/src/Entity/Journal.php b/src/Entity/Journal.php
+index ad6b377..d5ec0e3 100644
+--- a/src/Entity/Journal.php
++++ b/src/Entity/Journal.php
+@@ -3,9 +3,11 @@
+ namespace App\Entity;
+ 
+ use App\Repository\JournalRepository;
++use Doctrine\DBAL\Types\Types;
+ use Doctrine\ORM\Mapping as ORM;
+ 
+ #[ORM\Entity(repositoryClass: JournalRepository::class)]
++#[ORM\Index(name: 'idx_journal_date', columns: ['date'])]
+ class Journal
+ {
+     #[ORM\Id]
+@@ -22,8 +24,11 @@ class Journal
+     #[ORM\Column(length: 50)]
+     private ?string $adresseIp = null;
+ 
++    #[ORM\Column(type: Types::TEXT, nullable: true)]
++    private ?string $details = null;
++
+     #[ORM\ManyToOne]
+-    private ?utilisateur $utilisateur = null;
++    private ?Utilisateur $utilisateur = null;
+ 
+     public function getId(): ?int
+     {
+@@ -66,12 +71,24 @@ class Journal
+         return $this;
+     }
+ 
+-    public function getUtilisateur(): ?utilisateur
++    public function getDetails(): ?string
++    {
++        return $this->details;
++    }
++
++    public function setDetails(?string $details): static
++    {
++        $this->details = $details;
++
++        return $this;
++    }
++
++    public function getUtilisateur(): ?Utilisateur
+     {
+         return $this->utilisateur;
+     }
+ 
+-    public function setUtilisateur(?utilisateur $utilisateur): static
++    public function setUtilisateur(?Utilisateur $utilisateur): static
+     {
+         $this->utilisateur = $utilisateur;
+ 
+diff --git a/src/EventListener/JournalConnexionListener.php b/src/EventListener/JournalConnexionListener.php
+new file mode 100644
+index 0000000..0759242
+--- /dev/null
++++ b/src/EventListener/JournalConnexionListener.php
+@@ -0,0 +1,47 @@
++<?php
++
++namespace App\EventListener;
++
++use App\Entity\Utilisateur;
++use App\Service\JournalService;
++use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
++use Symfony\Component\Security\Http\Event\LoginFailureEvent;
++use Symfony\Component\Security\Http\Event\LoginSuccessEvent;
++
++/**
++ * Journalise les connexions (pare-feu « login » uniquement : le pare-feu
++ * « api » déclenche aussi LoginSuccessEvent à chaque requête avec jeton).
++ */
++class JournalConnexionListener
++{
++    private const PARE_FEU_LOGIN = 'login';
++
++    public function __construct(private JournalService $journal)
++    {
++    }
++
++    #[AsEventListener]
++    public function onLoginSuccess(LoginSuccessEvent $event): void
++    {
++        if ($event->getFirewallName() !== self::PARE_FEU_LOGIN) {
++            return;
++        }
++        $utilisateur = $event->getUser();
++        if ($utilisateur instanceof Utilisateur) {
++            $this->journal->enregistrer('connexion', $utilisateur);
++        }
++    }
++
++    #[AsEventListener]
++    public function onLoginFailure(LoginFailureEvent $event): void
++    {
++        if ($event->getFirewallName() !== self::PARE_FEU_LOGIN) {
++            return;
++        }
++        // Jamais le mot de passe : seulement l'e-mail saisi.
++        $donnees = json_decode($event->getRequest()->getContent(), true);
++        $email = is_array($donnees) && is_string($donnees['email'] ?? null) ? $donnees['email'] : null;
++
++        $this->journal->enregistrer('connexion_echec', null, $email === null ? null : 'email=' . mb_substr($email, 0, 100));
++    }
++}
+diff --git a/src/Repository/JournalRepository.php b/src/Repository/JournalRepository.php
+index 8c9a1b3..55a79aa 100644
+--- a/src/Repository/JournalRepository.php
++++ b/src/Repository/JournalRepository.php
+@@ -4,6 +4,7 @@ namespace App\Repository;
+ 
+ use App\Entity\Journal;
+ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
++use Doctrine\ORM\QueryBuilder;
+ use Doctrine\Persistence\ManagerRegistry;
+ 
+ /**
+@@ -16,6 +17,60 @@ class JournalRepository extends ServiceEntityRepository
+         parent::__construct($registry, Journal::class);
+     }
+ 
++    /**
++     * Consultation paginée, du plus récent au plus ancien.
++     * Filtres facultatifs : action (exacte), utilisateurId, du / au (jours inclus).
++     *
++     * @param array{action?: ?string, utilisateurId?: ?int, du?: ?\DateTimeImmutable, au?: ?\DateTimeImmutable} $filtres
++     *
++     * @return array{items: Journal[], total: int}
++     */
++    public function rechercher(array $filtres, int $page, int $limite): array
++    {
++        $qb = $this->filtrer($this->createQueryBuilder('j')->leftJoin('j.utilisateur', 'u')->addSelect('u'), $filtres)
++            ->orderBy('j.date', 'DESC')
++            ->addOrderBy('j.id', 'DESC')
++            ->setFirstResult(($page - 1) * $limite)
++            ->setMaxResults($limite);
++
++        $total = (int) $this->filtrer($this->createQueryBuilder('j')->select('COUNT(j.id)'), $filtres)
++            ->getQuery()
++            ->getSingleScalarResult();
++
++        return ['items' => $qb->getQuery()->getResult(), 'total' => $total];
++    }
++
++    /** @return string[] actions distinctes déjà enregistrées (pour un menu de filtre) */
++    public function actionsConnues(): array
++    {
++        $lignes = $this->createQueryBuilder('j')
++            ->select('DISTINCT j.action AS action')
++            ->orderBy('j.action', 'ASC')
++            ->getQuery()
++            ->getScalarResult();
++
++        return array_column($lignes, 'action');
++    }
++
++    private function filtrer(QueryBuilder $qb, array $filtres): QueryBuilder
++    {
++        if (!empty($filtres['action'])) {
++            $qb->andWhere('j.action = :action')->setParameter('action', $filtres['action']);
++        }
++        if (!empty($filtres['utilisateurId'])) {
++            $qb->andWhere('IDENTITY(j.utilisateur) = :uid')->setParameter('uid', $filtres['utilisateurId']);
++        }
++        if (!empty($filtres['du'])) {
++            $qb->andWhere('j.date >= :du')->setParameter('du', $filtres['du']);
++        }
++        if (!empty($filtres['au'])) {
++            // « au » est inclus : on s'arrête à minuit du lendemain (exclu).
++            $qb->andWhere('j.date < :au')->setParameter('au', $filtres['au']->modify('+1 day'));
++        }
++
++        return $qb;
++    }
++
+ //    /**
+ //     * @return Journal[] Returns an array of Journal objects
+ //     */
+diff --git a/src/Service/JournalService.php b/src/Service/JournalService.php
+new file mode 100644
+index 0000000..10bf4ad
+--- /dev/null
++++ b/src/Service/JournalService.php
+@@ -0,0 +1,49 @@
++<?php
++
++namespace App\Service;
++
++use App\Entity\Journal;
++use App\Entity\Utilisateur;
++use Doctrine\ORM\EntityManagerInterface;
++use Psr\Log\LoggerInterface;
++use Symfony\Component\HttpFoundation\RequestStack;
++
++/**
++ * Journal d'audit des actions sensibles. Un échec d'écriture du journal ne
++ * doit jamais faire échouer l'action métier : il est seulement consigné
++ * dans les logs Symfony (var/log).
++ *
++ * Noms d'actions utilisés : connexion, connexion_echec, inscription,
++ * demande_creee, demande_reorientee, demande_statut, rdv_reserve,
++ * rdv_confirme, rdv_refuse, rdv_annule, rdv_termine, rdv_absent, avis_donne.
++ */
++class JournalService
++{
++    public const ACTION_MAX = 50;
++    public const DETAILS_MAX = 500;
++
++    public function __construct(
++        private EntityManagerInterface $em,
++        private RequestStack $requestStack,
++        private LoggerInterface $logger,
++    ) {
++    }
++
++    public function enregistrer(string $action, ?Utilisateur $utilisateur = null, ?string $details = null): void
++    {
++        try {
++            $journal = new Journal();
++            $journal->setAction(mb_substr($action, 0, self::ACTION_MAX));
++            $journal->setDate(new \DateTimeImmutable());
++            // En ligne de commande (pas de requête) : adresse « cli ».
++            $journal->setAdresseIp(mb_substr($this->requestStack->getCurrentRequest()?->getClientIp() ?? 'cli', 0, 50));
++            $journal->setUtilisateur($utilisateur);
++            $journal->setDetails($details === null ? null : mb_substr($details, 0, self::DETAILS_MAX));
++
++            $this->em->persist($journal);
++            $this->em->flush();
++        } catch (\Throwable $e) {
++            $this->logger->error('Journal d\'audit : écriture impossible (' . $action . ') : ' . $e->getMessage());
++        }
++    }
++}

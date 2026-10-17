@@ -6,6 +6,7 @@ use App\Entity\Role;
 use App\Entity\Utilisateur;
 use App\Repository\RoleRepository;
 use App\Repository\UtilisateurRepository;
+use App\Service\JournalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +28,7 @@ class AuthController extends AbstractController
         private UtilisateurRepository $utilisateurRepository,
         private RoleRepository $roleRepository,
         private UserPasswordHasherInterface $passwordHasher,
+        private JournalService $journal,
     ) {
     }
 
@@ -69,6 +71,7 @@ class AuthController extends AbstractController
 
         $this->em->persist($utilisateur);
         $this->em->flush();
+        $this->journal->enregistrer('inscription', $utilisateur);
 
         return $this->json([
             'id' => $utilisateur->getId(),
