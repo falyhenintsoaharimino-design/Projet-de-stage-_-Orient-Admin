@@ -6,6 +6,7 @@ use App\Entity\RendezVous;
 use App\Entity\Utilisateur;
 use App\Repository\DemandeRepository;
 use App\Repository\RendezVousRepository;
+use App\Service\NotificationService;
 use App\Service\RendezVousService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,7 @@ class RendezVousApiController extends AbstractController
         private RendezVousRepository $rendezVousRepository,
         private DemandeRepository $demandeRepository,
         private RendezVousService $rendezVousService,
+        private NotificationService $notifications,
     ) {
     }
 
@@ -173,6 +175,10 @@ class RendezVousApiController extends AbstractController
         }
 
         $rdv->setStatut($statut);
+        if ($statut === 'termine') {
+            // Invite le citoyen à donner son avis (POST /api/avis).
+            $this->notifications->notifierRendezVous($rdv, 'termine');
+        }
         $this->em->flush();
 
         return $this->json($this->toArray($rdv));

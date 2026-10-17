@@ -20,9 +20,13 @@ class Avis
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $commentaire = null;
 
-    #[ORM\ManyToOne]
+    // OneToOne : un rendez-vous ne peut recevoir qu'un seul avis (index unique en base).
+    #[ORM\OneToOne(targetEntity: RendezVous::class)]
     #[ORM\JoinColumn(nullable: false)]
-    private ?rendezVous $rendezVous = null;
+    private ?RendezVous $rendezVous = null;
+
+    #[ORM\Column]
+    private ?\DateTimeImmutable $dateCreation = null;
 
     public function getId(): ?int
     {
@@ -54,14 +58,26 @@ class Avis
         return $this;
     }
 
-    public function getRendezVous(): ?rendezVous
+    public function getRendezVous(): ?RendezVous
     {
         return $this->rendezVous;
     }
 
-    public function setRendezVous(?rendezVous $rendezVous): static
+    public function setRendezVous(?RendezVous $rendezVous): static
     {
         $this->rendezVous = $rendezVous;
+
+        return $this;
+    }
+
+    public function getDateCreation(): ?\DateTimeImmutable
+    {
+        return $this->dateCreation;
+    }
+
+    public function setDateCreation(\DateTimeImmutable $dateCreation): static
+    {
+        $this->dateCreation = $dateCreation;
 
         return $this;
     }

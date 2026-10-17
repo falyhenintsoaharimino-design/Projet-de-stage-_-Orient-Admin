@@ -52,7 +52,7 @@ class NotificationService
     }
 
     /**
-     * Événements d'un rendez-vous : reserve, confirme, refuse, annule.
+     * Événements d'un rendez-vous : reserve, confirme, refuse, annule, termine.
      * $par = l'utilisateur qui a agi (sert à savoir qui prévenir en cas d'annulation).
      */
     public function notifierRendezVous(RendezVous $rdv, string $evenement, ?Utilisateur $par = null): void
@@ -87,6 +87,11 @@ class NotificationService
             case 'refuse':
                 $this->notifier($citoyen, 'rdv_refuse', 'Rendez-vous refusé',
                     "Votre rendez-vous $quand ($lieu) a été refusé. Vous pouvez choisir un autre créneau.");
+                break;
+
+            case 'termine':
+                $this->notifier($citoyen, 'rdv_termine', 'Votre rendez-vous est terminé',
+                    "Votre rendez-vous $quand ($lieu) est terminé. Donnez votre avis pour nous aider à améliorer le service.");
                 break;
 
             case 'annule':

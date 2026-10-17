@@ -3,6 +3,8 @@
 namespace App\Repository;
 
 use App\Entity\Avis;
+use App\Entity\Service;
+use App\Entity\Utilisateur;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -14,6 +16,34 @@ class AvisRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Avis::class);
+    }
+
+    /**
+     * Avis les plus récents d'abord. Tous les filtres sont facultatifs :
+     * $service (service du rendez-vous), $citoyen (auteur de la demande), $note (1 à 5).
+     *
+     * @return Avis[]
+     */
+    public function rechercher(?Service $service = null, ?Utilisateur $citoyen = null, ?int $note = null): array
+    {
+        $qb = $this->createQueryBuilder('a')
+            ->join('a.rendezVous', 'r')
+            ->join('r.creneau', 'c')
+            ->join('r.demande', 'd')
+            ->orderBy('a.dateCreation', 'DESC')
+            ->addOrderBy('a.id', 'DESC');
+
+        if ($service) {
+            $qb->andWhere('c.service = :service')->setParameter('service', $service);
+        }
+        if ($citoyen) {
+            $qb->andWhere('d.utilisateur = :citoyen')->setParameter('citoyen', $citoyen);
+        }
+        if ($note !== null) {
+            $qb->andWhere('a.note = :note')->setParameter('note', $note);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
 //    /**
