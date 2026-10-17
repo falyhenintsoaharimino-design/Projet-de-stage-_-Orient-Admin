@@ -1,0 +1,352 @@
+diff --git a/scripts/smoke-journal.sh b/scripts/smoke-journal.sh
+index b835bda..85c4e31 100755
+--- a/scripts/smoke-journal.sh
++++ b/scripts/smoke-journal.sh
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env bash
+-# Recette du journal d'audit (étape 3 du backend).
++# Recette du journal d'audit (étape 3 du backend, créneaux inclus).
+ # Usage : bash scripts/smoke-journal.sh            (serveur sur http://127.0.0.1:8000)
+ #         SERVICE_ID=2 bash scripts/smoke-journal.sh   (si l'agent n'est pas sur le service 1)
+ # Prérequis : migration appliquée (php bin/console doctrine:migrations:migrate),
+@@ -167,6 +167,26 @@ egal "page hors limites : liste vide" "$(printf '%s' "$BODY" | php -r '$d=json_d
+ api GET /api/journal/actions "$ADM"
+ case "$BODY" in *rdv_confirme*) ok "liste des actions contient rdv_confirme";; *) ko "liste des actions" "$BODY";; esac
+ 
++echo "== 9. Créneaux =="
++B_CC=$(nb creneau_cree); B_CM=$(nb creneau_modifie); B_CS=$(nb creneau_supprime)
++api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}"; C3=$(jget "$BODY" crees.0.id)
++[ -n "$C3" ] && ok "créneau $C3 créé" || ko "création créneau" "relance le script (heure déjà prise ?) $BODY"
++delta creneau_cree "$B_CC" 1 "creneau_cree journalisé"
++api GET "/api/journal?action=creneau_cree&limite=1" "$ADM"
++egal "creneau_cree : auteur = l'agent" "$(jget "$BODY" items.0.utilisateur.email)" "agent@test.com"
++api POST /api/creneaux "$AGT" "{\"date\":\"2000-01-01\",\"heures\":[\"09:00\"]}"; code_attendu "date passée -> 400" 400
++delta creneau_cree "$B_CC" 1 "une création refusée n'est pas journalisée"
++api PATCH "/api/creneaux/$C3" "$AGT" '{"disponible":false}'; code_attendu "agent ferme le créneau" 200
++delta creneau_modifie "$B_CM" 1 "creneau_modifie journalisé"
++api GET "/api/journal?action=creneau_modifie&limite=1" "$ADM"
++egal "creneau_modifie : détail" "$(jget "$BODY" items.0.details)" "creneau=$C3 disponible=non"
++api PATCH "/api/creneaux/$C3" "$AGT" '{"disponible":"oui"}'; code_attendu "valeur invalide -> 400" 400
++delta creneau_modifie "$B_CM" 1 "une modification refusée n'est pas journalisée"
++api DELETE "/api/creneaux/$C3" "$AGT"; code_attendu "agent supprime le créneau" 204
++delta creneau_supprime "$B_CS" 1 "creneau_supprime journalisé"
++api DELETE "/api/creneaux/$C1" "$AGT"; code_attendu "créneau déjà réservé -> 409" 409
++delta creneau_supprime "$B_CS" 1 "une suppression refusée n'est pas journalisée"
++
+ echo
+ echo "Résultat : $NB_OK OK, $NB_KO ÉCHEC"
+ [ "$NB_KO" = "0" ]
+diff --git a/src/Controller/CreneauApiController.php b/src/Controller/CreneauApiController.php
+index dd12ff2..d9e7812 100644
+--- a/src/Controller/CreneauApiController.php
++++ b/src/Controller/CreneauApiController.php
+@@ -8,6 +8,7 @@ use App\Entity\Utilisateur;
+ use App\Repository\CreneauRepository;
+ use App\Repository\RendezVousRepository;
+ use App\Repository\ServiceRepository;
++use App\Service\JournalService;
+ use Doctrine\ORM\EntityManagerInterface;
+ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+ use Symfony\Component\HttpFoundation\JsonResponse;
+@@ -31,6 +32,7 @@ class CreneauApiController extends AbstractController
+         private CreneauRepository $creneauRepository,
+         private RendezVousRepository $rendezVousRepository,
+         private ServiceRepository $serviceRepository,
++        private JournalService $journal,
+     ) {
+     }
+ 
+@@ -114,6 +116,9 @@ class CreneauApiController extends AbstractController
+             $crees[] = $creneau;
+         }
+         $this->em->flush();
++        if ($crees !== []) {
++            $this->journal->enregistrer('creneau_cree', $utilisateur, sprintf('service=%d date=%s creneaux=%s', $service->getId(), $date, implode(',', array_map(fn(Creneau $c) => $c->getId(), $crees))));
++        }
+ 
+         return $this->json([
+             'crees' => array_map(fn(Creneau $c) => $this->toArray($c), $crees),
+@@ -144,6 +149,7 @@ class CreneauApiController extends AbstractController
+ 
+         $creneau->setDisponible($data['disponible']);
+         $this->em->flush();
++        $this->journal->enregistrer('creneau_modifie', $utilisateur, sprintf('creneau=%d disponible=%s', $creneau->getId(), $data['disponible'] ? 'oui' : 'non'));
+ 
+         return $this->json($this->toArray($creneau));
+     }
+@@ -165,8 +171,10 @@ class CreneauApiController extends AbstractController
+             return $this->json(['error' => 'Ce créneau a déjà été réservé : fermez-le plutôt (disponible = false)'], 409);
+         }
+ 
++        $detail = sprintf('creneau=%d service=%d date=%s heure=%s', $creneau->getId(), $creneau->getService()?->getId() ?? 0, $creneau->getDate()?->format('Y-m-d'), $creneau->getHeure());
+         $this->em->remove($creneau);
+         $this->em->flush();
++        $this->journal->enregistrer('creneau_supprime', $utilisateur, $detail);
+ 
+         return $this->json(null, 204);
+     }
+diff --git a/src/Entity/Creneau.php b/src/Entity/Creneau.php
+index 137f592..3ab56de 100644
+--- a/src/Entity/Creneau.php
++++ b/src/Entity/Creneau.php
+@@ -25,7 +25,7 @@ class Creneau
+ 
+     #[ORM\ManyToOne(inversedBy: 'creneaux')]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?service $service = null;
++    private ?Service $service = null;
+ 
+     public function getId(): ?int
+     {
+@@ -68,12 +68,12 @@ class Creneau
+         return $this;
+     }
+ 
+-    public function getService(): ?service
++    public function getService(): ?Service
+     {
+         return $this->service;
+     }
+ 
+-    public function setService(?service $service): static
++    public function setService(?Service $service): static
+     {
+         $this->service = $service;
+ 
+diff --git a/src/Entity/Demande.php b/src/Entity/Demande.php
+index ce3bf4b..cac7bc8 100644
+--- a/src/Entity/Demande.php
++++ b/src/Entity/Demande.php
+@@ -30,13 +30,13 @@ class Demande
+ 
+     #[ORM\ManyToOne(inversedBy: 'demandes')]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?utilisateur $utilisateur = null;
++    private ?Utilisateur $utilisateur = null;
+ 
+     #[ORM\ManyToOne]
+-    private ?service $serviceRecommande = null;
++    private ?Service $serviceRecommande = null;
+ 
+     #[ORM\ManyToOne]
+-    private ?service $serviceFinal = null;
++    private ?Service $serviceFinal = null;
+ 
+     /**
+      * @var Collection<int, HistoriqueStatut>
+@@ -102,36 +102,36 @@ class Demande
+         return $this;
+     }
+ 
+-    public function getUtilisateur(): ?utilisateur
++    public function getUtilisateur(): ?Utilisateur
+     {
+         return $this->utilisateur;
+     }
+ 
+-    public function setUtilisateur(?utilisateur $utilisateur): static
++    public function setUtilisateur(?Utilisateur $utilisateur): static
+     {
+         $this->utilisateur = $utilisateur;
+ 
+         return $this;
+     }
+ 
+-    public function getServiceRecommande(): ?service
++    public function getServiceRecommande(): ?Service
+     {
+         return $this->serviceRecommande;
+     }
+ 
+-    public function setServiceRecommande(?service $serviceRecommande): static
++    public function setServiceRecommande(?Service $serviceRecommande): static
+     {
+         $this->serviceRecommande = $serviceRecommande;
+ 
+         return $this;
+     }
+ 
+-    public function getServiceFinal(): ?service
++    public function getServiceFinal(): ?Service
+     {
+         return $this->serviceFinal;
+     }
+ 
+-    public function setServiceFinal(?service $serviceFinal): static
++    public function setServiceFinal(?Service $serviceFinal): static
+     {
+         $this->serviceFinal = $serviceFinal;
+ 
+diff --git a/src/Entity/DocumentRequis.php b/src/Entity/DocumentRequis.php
+index 21b3c50..0fc652d 100644
+--- a/src/Entity/DocumentRequis.php
++++ b/src/Entity/DocumentRequis.php
+@@ -25,7 +25,7 @@ class DocumentRequis
+ 
+     #[ORM\ManyToOne(inversedBy: 'documentRequis')]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?procedure $procedure = null;
++    private ?Procedure $procedure = null;
+ 
+     public function getId(): ?int
+     {
+@@ -68,12 +68,12 @@ class DocumentRequis
+         return $this;
+     }
+ 
+-    public function getProcedure(): ?procedure
++    public function getProcedure(): ?Procedure
+     {
+         return $this->procedure;
+     }
+ 
+-    public function setProcedure(?procedure $procedure): static
++    public function setProcedure(?Procedure $procedure): static
+     {
+         $this->procedure = $procedure;
+ 
+diff --git a/src/Entity/EtapeProcedure.php b/src/Entity/EtapeProcedure.php
+index 6583bb4..17e010b 100644
+--- a/src/Entity/EtapeProcedure.php
++++ b/src/Entity/EtapeProcedure.php
+@@ -22,7 +22,7 @@ class EtapeProcedure
+ 
+     #[ORM\ManyToOne(inversedBy: 'etapeProcedures')]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?procedure $procedure = null;
++    private ?Procedure $procedure = null;
+ 
+     public function getId(): ?int
+     {
+@@ -53,12 +53,12 @@ class EtapeProcedure
+         return $this;
+     }
+ 
+-    public function getProcedure(): ?procedure
++    public function getProcedure(): ?Procedure
+     {
+         return $this->procedure;
+     }
+ 
+-    public function setProcedure(?procedure $procedure): static
++    public function setProcedure(?Procedure $procedure): static
+     {
+         $this->procedure = $procedure;
+ 
+diff --git a/src/Entity/HistoriqueStatut.php b/src/Entity/HistoriqueStatut.php
+index 9321034..5a5c41e 100644
+--- a/src/Entity/HistoriqueStatut.php
++++ b/src/Entity/HistoriqueStatut.php
+@@ -21,7 +21,7 @@ class HistoriqueStatut
+ 
+     #[ORM\ManyToOne(inversedBy: 'historiqueStatuts')]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?demande $demande = null;
++    private ?Demande $demande = null;
+ 
+     public function getId(): ?int
+     {
+@@ -52,12 +52,12 @@ class HistoriqueStatut
+         return $this;
+     }
+ 
+-    public function getDemande(): ?demande
++    public function getDemande(): ?Demande
+     {
+         return $this->demande;
+     }
+ 
+-    public function setDemande(?demande $demande): static
++    public function setDemande(?Demande $demande): static
+     {
+         $this->demande = $demande;
+ 
+diff --git a/src/Entity/Notification.php b/src/Entity/Notification.php
+index 6047197..d876125 100644
+--- a/src/Entity/Notification.php
++++ b/src/Entity/Notification.php
+@@ -31,7 +31,7 @@ class Notification
+ 
+     #[ORM\ManyToOne(inversedBy: 'notifications')]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?utilisateur $utilisateur = null;
++    private ?Utilisateur $utilisateur = null;
+ 
+     public function getId(): ?int
+     {
+@@ -98,12 +98,12 @@ class Notification
+         return $this;
+     }
+ 
+-    public function getUtilisateur(): ?utilisateur
++    public function getUtilisateur(): ?Utilisateur
+     {
+         return $this->utilisateur;
+     }
+ 
+-    public function setUtilisateur(?utilisateur $utilisateur): static
++    public function setUtilisateur(?Utilisateur $utilisateur): static
+     {
+         $this->utilisateur = $utilisateur;
+ 
+diff --git a/src/Entity/RendezVous.php b/src/Entity/RendezVous.php
+index ab79d47..bcb258d 100644
+--- a/src/Entity/RendezVous.php
++++ b/src/Entity/RendezVous.php
+@@ -18,11 +18,11 @@ class RendezVous
+ 
+     #[ORM\ManyToOne]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?demande $demande = null;
++    private ?Demande $demande = null;
+ 
+     #[ORM\ManyToOne]
+     #[ORM\JoinColumn(nullable: false)]
+-    private ?creneau $creneau = null;
++    private ?Creneau $creneau = null;
+ 
+     public function getId(): ?int
+     {
+@@ -41,24 +41,24 @@ class RendezVous
+         return $this;
+     }
+ 
+-    public function getDemande(): ?demande
++    public function getDemande(): ?Demande
+     {
+         return $this->demande;
+     }
+ 
+-    public function setDemande(?demande $demande): static
++    public function setDemande(?Demande $demande): static
+     {
+         $this->demande = $demande;
+ 
+         return $this;
+     }
+ 
+-    public function getCreneau(): ?creneau
++    public function getCreneau(): ?Creneau
+     {
+         return $this->creneau;
+     }
+ 
+-    public function setCreneau(?creneau $creneau): static
++    public function setCreneau(?Creneau $creneau): static
+     {
+         $this->creneau = $creneau;
+ 
+diff --git a/src/Service/JournalService.php b/src/Service/JournalService.php
+index 10bf4ad..70a1921 100644
+--- a/src/Service/JournalService.php
++++ b/src/Service/JournalService.php
+@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\RequestStack;
+  *
+  * Noms d'actions utilisés : connexion, connexion_echec, inscription,
+  * demande_creee, demande_reorientee, demande_statut, rdv_reserve,
+- * rdv_confirme, rdv_refuse, rdv_annule, rdv_termine, rdv_absent, avis_donne.
++ * rdv_confirme, rdv_refuse, rdv_annule, rdv_termine, rdv_absent, avis_donne,
++ * creneau_cree, creneau_modifie, creneau_supprime.
+  */
+ class JournalService
+ {

@@ -30,13 +30,13 @@ class Demande
 
     #[ORM\ManyToOne(inversedBy: 'demandes')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?utilisateur $utilisateur = null;
+    private ?Utilisateur $utilisateur = null;
 
     #[ORM\ManyToOne]
-    private ?service $serviceRecommande = null;
+    private ?Service $serviceRecommande = null;
 
     #[ORM\ManyToOne]
-    private ?service $serviceFinal = null;
+    private ?Service $serviceFinal = null;
 
     /**
      * @var Collection<int, HistoriqueStatut>
@@ -102,36 +102,36 @@ class Demande
         return $this;
     }
 
-    public function getUtilisateur(): ?utilisateur
+    public function getUtilisateur(): ?Utilisateur
     {
         return $this->utilisateur;
     }
 
-    public function setUtilisateur(?utilisateur $utilisateur): static
+    public function setUtilisateur(?Utilisateur $utilisateur): static
     {
         $this->utilisateur = $utilisateur;
 
         return $this;
     }
 
-    public function getServiceRecommande(): ?service
+    public function getServiceRecommande(): ?Service
     {
         return $this->serviceRecommande;
     }
 
-    public function setServiceRecommande(?service $serviceRecommande): static
+    public function setServiceRecommande(?Service $serviceRecommande): static
     {
         $this->serviceRecommande = $serviceRecommande;
 
         return $this;
     }
 
-    public function getServiceFinal(): ?service
+    public function getServiceFinal(): ?Service
     {
         return $this->serviceFinal;
     }
 
-    public function setServiceFinal(?service $serviceFinal): static
+    public function setServiceFinal(?Service $serviceFinal): static
     {
         $this->serviceFinal = $serviceFinal;
 

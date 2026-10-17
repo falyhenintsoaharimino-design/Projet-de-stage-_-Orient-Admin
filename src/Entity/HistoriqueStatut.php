@@ -21,7 +21,7 @@ class HistoriqueStatut
 
     #[ORM\ManyToOne(inversedBy: 'historiqueStatuts')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?demande $demande = null;
+    private ?Demande $demande = null;
 
     public function getId(): ?int
     {
@@ -52,12 +52,12 @@ class HistoriqueStatut
         return $this;
     }
 
-    public function getDemande(): ?demande
+    public function getDemande(): ?Demande
     {
         return $this->demande;
     }
 
-    public function setDemande(?demande $demande): static
+    public function setDemande(?Demande $demande): static
     {
         $this->demande = $demande;
 

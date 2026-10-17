@@ -8,6 +8,7 @@ use App\Entity\Utilisateur;
 use App\Repository\CreneauRepository;
 use App\Repository\RendezVousRepository;
 use App\Repository\ServiceRepository;
+use App\Service\JournalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,6 +32,7 @@ class CreneauApiController extends AbstractController
         private CreneauRepository $creneauRepository,
         private RendezVousRepository $rendezVousRepository,
         private ServiceRepository $serviceRepository,
+        private JournalService $journal,
     ) {
     }
 
@@ -114,6 +116,9 @@ class CreneauApiController extends AbstractController
             $crees[] = $creneau;
         }
         $this->em->flush();
+        if ($crees !== []) {
+            $this->journal->enregistrer('creneau_cree', $utilisateur, sprintf('service=%d date=%s creneaux=%s', $service->getId(), $date, implode(',', array_map(fn(Creneau $c) => $c->getId(), $crees))));
+        }
 
         return $this->json([
             'crees' => array_map(fn(Creneau $c) => $this->toArray($c), $crees),
@@ -144,6 +149,7 @@ class CreneauApiController extends AbstractController
 
         $creneau->setDisponible($data['disponible']);
         $this->em->flush();
+        $this->journal->enregistrer('creneau_modifie', $utilisateur, sprintf('creneau=%d disponible=%s', $creneau->getId(), $data['disponible'] ? 'oui' : 'non'));
 
         return $this->json($this->toArray($creneau));
     }
@@ -165,8 +171,10 @@ class CreneauApiController extends AbstractController
             return $this->json(['error' => 'Ce créneau a déjà été réservé : fermez-le plutôt (disponible = false)'], 409);
         }
 
+        $detail = sprintf('creneau=%d service=%d date=%s heure=%s', $creneau->getId(), $creneau->getService()?->getId() ?? 0, $creneau->getDate()?->format('Y-m-d'), $creneau->getHeure());
         $this->em->remove($creneau);
         $this->em->flush();
+        $this->journal->enregistrer('creneau_supprime', $utilisateur, $detail);
 
         return $this->json(null, 204);
     }

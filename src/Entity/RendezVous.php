@@ -18,11 +18,11 @@ class RendezVous
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
-    private ?demande $demande = null;
+    private ?Demande $demande = null;
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
-    private ?creneau $creneau = null;
+    private ?Creneau $creneau = null;
 
     public function getId(): ?int
     {
@@ -41,24 +41,24 @@ class RendezVous
         return $this;
     }
 
-    public function getDemande(): ?demande
+    public function getDemande(): ?Demande
     {
         return $this->demande;
     }
 
-    public function setDemande(?demande $demande): static
+    public function setDemande(?Demande $demande): static
     {
         $this->demande = $demande;
 
         return $this;
     }
 
-    public function getCreneau(): ?creneau
+    public function getCreneau(): ?Creneau
     {
         return $this->creneau;
     }
 
-    public function setCreneau(?creneau $creneau): static
+    public function setCreneau(?Creneau $creneau): static
     {
         $this->creneau = $creneau;
 

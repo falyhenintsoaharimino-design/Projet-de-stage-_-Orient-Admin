@@ -25,7 +25,7 @@ class DocumentRequis
 
     #[ORM\ManyToOne(inversedBy: 'documentRequis')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?procedure $procedure = null;
+    private ?Procedure $procedure = null;
 
     public function getId(): ?int
     {
@@ -68,12 +68,12 @@ class DocumentRequis
         return $this;
     }
 
-    public function getProcedure(): ?procedure
+    public function getProcedure(): ?Procedure
     {
         return $this->procedure;
     }
 
-    public function setProcedure(?procedure $procedure): static
+    public function setProcedure(?Procedure $procedure): static
     {
         $this->procedure = $procedure;
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Recette du journal d'audit (étape 3 du backend).
+# Recette du journal d'audit (étape 3 du backend, créneaux inclus).
 # Usage : bash scripts/smoke-journal.sh            (serveur sur http://127.0.0.1:8000)
 #         SERVICE_ID=2 bash scripts/smoke-journal.sh   (si l'agent n'est pas sur le service 1)
 # Prérequis : migration appliquée (php bin/console doctrine:migrations:migrate),
@@ -166,6 +166,26 @@ api GET "/api/journal?page=99999" "$ADM"; code_attendu "page hors limites -> 200
 egal "page hors limites : liste vide" "$(printf '%s' "$BODY" | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo count($d["items"]);')" 0
 api GET /api/journal/actions "$ADM"
 case "$BODY" in *rdv_confirme*) ok "liste des actions contient rdv_confirme";; *) ko "liste des actions" "$BODY";; esac
+
+echo "== 9. Créneaux =="
+B_CC=$(nb creneau_cree); B_CM=$(nb creneau_modifie); B_CS=$(nb creneau_supprime)
+api POST /api/creneaux "$AGT" "{\"date\":\"$JOUR\",\"heures\":[$(h)]}"; C3=$(jget "$BODY" crees.0.id)
+[ -n "$C3" ] && ok "créneau $C3 créé" || ko "création créneau" "relance le script (heure déjà prise ?) $BODY"
+delta creneau_cree "$B_CC" 1 "creneau_cree journalisé"
+api GET "/api/journal?action=creneau_cree&limite=1" "$ADM"
+egal "creneau_cree : auteur = l'agent" "$(jget "$BODY" items.0.utilisateur.email)" "agent@test.com"
+api POST /api/creneaux "$AGT" "{\"date\":\"2000-01-01\",\"heures\":[\"09:00\"]}"; code_attendu "date passée -> 400" 400
+delta creneau_cree "$B_CC" 1 "une création refusée n'est pas journalisée"
+api PATCH "/api/creneaux/$C3" "$AGT" '{"disponible":false}'; code_attendu "agent ferme le créneau" 200
+delta creneau_modifie "$B_CM" 1 "creneau_modifie journalisé"
+api GET "/api/journal?action=creneau_modifie&limite=1" "$ADM"
+egal "creneau_modifie : détail" "$(jget "$BODY" items.0.details)" "creneau=$C3 disponible=non"
+api PATCH "/api/creneaux/$C3" "$AGT" '{"disponible":"oui"}'; code_attendu "valeur invalide -> 400" 400
+delta creneau_modifie "$B_CM" 1 "une modification refusée n'est pas journalisée"
+api DELETE "/api/creneaux/$C3" "$AGT"; code_attendu "agent supprime le créneau" 204
+delta creneau_supprime "$B_CS" 1 "creneau_supprime journalisé"
+api DELETE "/api/creneaux/$C1" "$AGT"; code_attendu "créneau déjà réservé -> 409" 409
+delta creneau_supprime "$B_CS" 1 "une suppression refusée n'est pas journalisée"
 
 echo
 echo "Résultat : $NB_OK OK, $NB_KO ÉCHEC"
