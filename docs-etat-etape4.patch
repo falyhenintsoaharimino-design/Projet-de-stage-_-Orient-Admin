@@ -1,0 +1,23 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 7f65d98..220e7c7 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -52,7 +52,7 @@ Fait, testé et poussé :
+ - Étape 2 Avis (`scripts/smoke-avis.sh`)
+ - Étape 3 Journal d'audit, créneaux inclus (`scripts/smoke-journal.sh`) :
+   `GET /api/journal` (admin ; filtres action, utilisateurId, du, au ; pagination) et `GET /api/journal/actions`
+-- Étape 4 Gestion admin + mot de passe oublié (`scripts/smoke-admin.sh`) :
++- Étape 4 Gestion admin + mot de passe oublié (`scripts/smoke-admin.sh`, testée sans erreur) :
+   `/api/admin/utilisateurs` (liste filtrée/paginée, détail, création, modification, `/{id}/actif`) et `/api/admin/roles`,
+   réservés à l'admin ; compte désactivé refusé à la connexion et sur les jetons déjà émis (`App\Security\UserChecker`) ;
+   `POST /api/mot-de-passe/oublie` et `/reinitialiser` (lien signé HMAC, 1 h, usage unique, sans table) ;
+@@ -67,6 +67,9 @@ Reste à faire, dans cet ordre :
+    responsable/*, admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
+    agent/demandes, prendre-rendez-vous, mes-rendez-vous, agent/rendez-vous, catalogue)
+ 9. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
++10. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
++    pour que ça ressemble à un vrai site web), puis version Android de l'application mobile.
++    Claude doit aider pour le déploiement et pour l'app Android.
+ 
+ Mettre cette section à jour à la fin de chaque étape, dans le même commit.
+ 
