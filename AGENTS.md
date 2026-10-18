@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 17/10/2026)
+### Avancement (mis à jour le 18/10/2026)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -52,9 +52,14 @@ Fait, testé et poussé :
 - Étape 2 Avis (`scripts/smoke-avis.sh`)
 - Étape 3 Journal d'audit, créneaux inclus (`scripts/smoke-journal.sh`) :
   `GET /api/journal` (admin ; filtres action, utilisateurId, du, au ; pagination) et `GET /api/journal/actions`
+- Étape 4 Gestion admin + mot de passe oublié (`scripts/smoke-admin.sh`) :
+  `/api/admin/utilisateurs` (liste filtrée/paginée, détail, création, modification, `/{id}/actif`) et `/api/admin/roles`,
+  réservés à l'admin ; compte désactivé refusé à la connexion et sur les jetons déjà émis (`App\Security\UserChecker`) ;
+  `POST /api/mot-de-passe/oublie` et `/reinitialiser` (lien signé HMAC, 1 h, usage unique, sans table) ;
+  commande `php bin/console app:lien-reinitialisation <email> [--jeton] [--expire]` (tests) ; variable `APP_URL`.
+  Le lien pointe vers `/pages/auth/reinitialiser-mot-de-passe.html?token=...` (page front à créer).
 
 Reste à faire, dans cet ordre :
-4. Gestion admin (utilisateurs, rôles) + mot de passe oublié (lien signé)
 5. Statistiques + dashboard responsable + export CSV
 6. Moteur d'orientation (non bloquant)
 7. Tests des accès par rôle (PHPUnit) + OpenAPI

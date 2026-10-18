@@ -16,7 +16,9 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * Noms d'actions utilisés : connexion, connexion_echec, inscription,
  * demande_creee, demande_reorientee, demande_statut, rdv_reserve,
  * rdv_confirme, rdv_refuse, rdv_annule, rdv_termine, rdv_absent, avis_donne,
- * creneau_cree, creneau_modifie, creneau_supprime.
+ * creneau_cree, creneau_modifie, creneau_supprime, utilisateur_cree,
+ * utilisateur_modifie, utilisateur_active, utilisateur_desactive,
+ * mdp_oublie_demande, mdp_reinitialise.
  */
 class JournalService
 {

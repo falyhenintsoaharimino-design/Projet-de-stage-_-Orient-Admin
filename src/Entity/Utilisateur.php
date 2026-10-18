@@ -36,6 +36,9 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\ManyToOne]
     private ?Service $service = null;
 
+    #[ORM\Column(options: ['default' => true])]
+    private bool $actif = true;
+
     /**
      * @var Collection<int, Demande>
      */
@@ -115,6 +118,18 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     public function setRole(?Role $role): static
     {
         $this->role = $role;
+
+        return $this;
+    }
+
+    public function isActif(): bool
+    {
+        return $this->actif;
+    }
+
+    public function setActif(bool $actif): static
+    {
+        $this->actif = $actif;
 
         return $this;
     }

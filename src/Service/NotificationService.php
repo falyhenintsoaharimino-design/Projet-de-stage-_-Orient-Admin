@@ -110,7 +110,8 @@ class NotificationService
         }
     }
 
-    private function envoyerEmail(Utilisateur $destinataire, string $sujet, string $message): void
+    /** E-mail seul, sans ligne de notification en base (ne lève jamais d'exception). */
+    public function envoyerEmail(Utilisateur $destinataire, string $sujet, string $message): void
     {
         if (!$destinataire->getEmail()) {
             return;

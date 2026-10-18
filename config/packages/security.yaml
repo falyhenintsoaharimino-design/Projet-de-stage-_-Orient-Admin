@@ -23,6 +23,7 @@ security:
         login:
             pattern: ^/api/login
             stateless: true
+            user_checker: App\Security\UserChecker
             json_login:
                 check_path: /api/login_check
                 username_path: email
@@ -33,11 +34,13 @@ security:
         api:
             pattern: ^/api
             stateless: true
+            user_checker: App\Security\UserChecker
             jwt: ~
 
     access_control:
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
+        - { path: ^/api/mot-de-passe/, roles: PUBLIC_ACCESS }
         - { path: ^/api/orientation/tester$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/services$, methods: [GET], roles: PUBLIC_ACCESS }
         - { path: ^/api/services/\d+$, methods: [GET], roles: PUBLIC_ACCESS }
