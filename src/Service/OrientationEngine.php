@@ -35,17 +35,72 @@ class OrientationEngine
 
     public function __construct(
         private readonly ServiceRepository $serviceRepository,
+        private readonly MoteurClient $moteur,
     ) {
     }
 
     /**
+     * Étape 5bis : on interroge d'abord le service Python (TF-IDF, voir moteur/).
+     * S'il est désactivé, arrêté ou incohérent avec le catalogue, on se rabat sur
+     * la version 1 par mots-clés : le site continue de fonctionner dans tous les cas.
+     *
      * @return array{
+     *   source: string,
      *   service: ?Service,
      *   confiance: float,
      *   alternatives: array<array{service: Service, confiance: float}>
      * }
      */
     public function orienter(string $texteDemande): array
+    {
+        return $this->orienterParIa($texteDemande)
+            ?? ['source' => 'mots_cles'] + $this->orienterParMotsCles($texteDemande);
+    }
+
+    /** @return ?array{source: string, service: ?Service, confiance: float, alternatives: array} null = repli */
+    private function orienterParIa(string $texteDemande): ?array
+    {
+        $r = $this->moteur->orienter($texteDemande);
+        if ($r === null) {
+            return null;
+        }
+
+        // Le service Python désigne les services par leur nom exact.
+        $parNom = [];
+        foreach ($this->serviceRepository->findBy(['actif' => true]) as $service) {
+            $parNom[$service->getNom()] = $service;
+        }
+        $resoudre = fn(array $x) => isset($parNom[$x['service']])
+            ? ['service' => $parNom[$x['service']], 'confiance' => round((float) $x['confiance'], 2)]
+            : null;
+
+        $meilleur = $resoudre($r);
+        if ($meilleur === null) {
+            return null;
+        }
+        if (!$r['compris']) {
+            // Pas assez sûr : aucune recommandation (EF-16), mais la confiance est conservée.
+            return ['source' => 'ia', 'service' => null, 'confiance' => $meilleur['confiance'], 'alternatives' => []];
+        }
+
+        return [
+            'source' => 'ia',
+            'service' => $meilleur['service'],
+            'confiance' => $meilleur['confiance'],
+            'alternatives' => array_values(array_filter(array_map($resoudre, $r['alternatives']))),
+        ];
+    }
+
+    /**
+     * Version 1 par mots-clés (repli).
+     *
+     * @return array{
+     *   service: ?Service,
+     *   confiance: float,
+     *   alternatives: array<array{service: Service, confiance: float}>
+     * }
+     */
+    private function orienterParMotsCles(string $texteDemande): array
     {
         $texte = $this->normaliser($texteDemande);
         $motsDuTexte = array_filter(explode(' ', $texte), fn(string $m) => $m !== '');

@@ -39,6 +39,8 @@ class OrientationApiController extends AbstractController
         $resultat = $this->orientationEngine->orienter($texte);
 
         return $this->json([
+            // 'ia' (service Python) ou 'mots_cles' (repli quand le service Python est indisponible)
+            'source' => $resultat['source'],
             'service' => $this->serviceResume($resultat['service']),
             'confiance' => $resultat['confiance'],
             'alternatives' => array_map(

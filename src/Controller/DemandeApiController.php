@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Demande;
+use App\Entity\ExempleOrientation;
 use App\Entity\HistoriqueStatut;
 use App\Entity\Utilisateur;
 use App\Repository\DemandeRepository;
 use App\Repository\ServiceRepository;
+use App\Service\ExempleOrientationService;
 use App\Service\JournalService;
 use App\Service\OrientationEngine;
 use Doctrine\ORM\EntityManagerInterface;
@@ -36,6 +38,7 @@ class DemandeApiController extends AbstractController
         private ServiceRepository $serviceRepository,
         private OrientationEngine $orientationEngine,
         private JournalService $journal,
+        private ExempleOrientationService $exemples,
     ) {
     }
 
@@ -162,11 +165,51 @@ class DemandeApiController extends AbstractController
         $demande->setServiceFinal($service);
         $demande->setStatus('orientee');
         $this->ajouterHistorique($demande, 'orientee');
+        // Le choix de l'agent devient un exemple anonymisé pour le moteur (EF-19, EF-22).
+        $this->exemples->enregistrer($demande, $service, ExempleOrientation::ORIGINE_REORIENTATION);
 
         $this->em->flush();
         $this->journal->enregistrer('demande_reorientee', $utilisateur, sprintf('demande=%d service=%d', $demande->getId(), $service->getId()));
 
         return $this->json($this->toArray($demande, inclureHistorique: true));
+    }
+
+    /**
+     * Retour du citoyen sur la recommandation du moteur : « C'était le bon service ? » (EF-18).
+     * Corps : {"pertinent": true|false}. Modifiable à tout moment. Un « oui » ajoute un exemple
+     * anonymisé pour le moteur ; un « non » ne crée rien (c'est l'agent qui corrige).
+     */
+    #[Route('/{id}/retour', name: 'api_demandes_retour', methods: ['POST'])]
+    #[IsGranted('ROLE_CITOYEN')]
+    public function retour(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $demande = $this->demandeRepository->find($id);
+        if (!$demande) {
+            return $this->json(['error' => 'Demande non trouvée'], 404);
+        }
+        if ($demande->getUtilisateur() !== $utilisateur) {
+            return $this->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        if (!is_bool($data['pertinent'] ?? null)) {
+            return $this->json(['error' => 'pertinent doit valoir true ou false'], 422);
+        }
+        $recommande = $demande->getServiceRecommande();
+        if (!$recommande) {
+            return $this->json(['error' => 'Le moteur n\'a fait aucune recommandation pour cette demande'], 409);
+        }
+
+        $demande->setRetourPertinent($data['pertinent']);
+        if ($data['pertinent']) {
+            $this->exemples->enregistrer($demande, $recommande, ExempleOrientation::ORIGINE_RETOUR_CITOYEN);
+        } else {
+            $this->exemples->retirerRetourCitoyen($demande);
+        }
+        $this->em->flush();
+        $this->journal->enregistrer('retour_orientation', $utilisateur, sprintf('demande=%d pertinent=%s', $demande->getId(), $data['pertinent'] ? 'oui' : 'non'));
+
+        return $this->json($this->toArray($demande));
     }
 
     /**
@@ -233,6 +276,7 @@ class DemandeApiController extends AbstractController
             'texte' => $demande->getTextDemande(),
             'statut' => $demande->getStatus(),
             'confiance' => $demande->getConfiance(),
+            'retourPertinent' => $demande->getRetourPertinent(),
             'dateCreation' => $demande->getDateCreation()?->format(DATE_ATOM),
             'serviceRecommande' => $this->serviceResume($demande->getServiceRecommande()),
             'serviceFinal' => $this->serviceResume($demande->getServiceFinal()),

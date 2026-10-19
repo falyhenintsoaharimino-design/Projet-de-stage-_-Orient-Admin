@@ -58,8 +58,7 @@ Fait, testé et poussé :
   `POST /api/mot-de-passe/oublie` et `/reinitialiser` (lien signé HMAC, 1 h, usage unique, sans table) ;
   commande `php bin/console app:lien-reinitialisation <email> [--jeton] [--expire]` (tests) ; variable `APP_URL`.
   Le lien pointe vers `/pages/auth/reinitialiser-mot-de-passe.html?token=...` (page front à créer).
-- Étape 5 Statistiques + dashboard responsable + export CSV (`scripts/smoke-stats.sh`, aucune migration ;
-  recette à lancer chez l'étudiant, passer cette ligne en « testée » une fois OK) :
+- Étape 5 Statistiques + dashboard responsable + export CSV (`scripts/smoke-stats.sh`, testée en vert, aucune migration) :
   `/api/statistiques/{tableau-de-bord, demandes, rendez-vous, affluence, satisfaction, orientation}` et
   `/api/statistiques/export?type=synthese|demandes|rendez-vous|avis` (CSV `;`, UTF-8 BOM), réservés au responsable
   (admin inclus) ; filtres `du`, `au` (AAAA-MM-JJ, inclus), `serviceId`, `pas=jour|mois`. Export journalisé (`export_rapport`).
@@ -68,14 +67,29 @@ Fait, testé et poussé :
   (`confiance` renseignée, pas de `serviceRecommande`) ; choix du citoyen (confiance nulle) exclu des taux ; l'affluence compte
   les rendez-vous en_attente/confirme/termine/absent. Non fait : temps d'attente estimé, export PDF/Excel natif (CSV ouvrable dans Excel).
 
+- Étape 5bis Moteur d'orientation (service Python séparé, choix de l'étudiant) :
+  - Partie A (testée) : dossier `moteur/` (FastAPI + TF-IDF/scikit-learn, voir `moteur/README.md`) : `/orienter`, `/reentrainer`,
+    `/metriques`, `/sante` ; 270 exemples d'entraînement, 207 demandes de test + 20 hors sujet ; jeton `X-Moteur-Token` ; services
+    identifiés par leur nom exact. Lancement : `cd moteur`, venv, `pip install -r requirements.txt`, `python -m uvicorn app:app --port 8001`.
+  - Partie B (`scripts/smoke-moteur.sh`, `REPLI=1` pour tester sans le moteur Python ; migration `Version20261019120000` ;
+    recette à confirmer, passer en « testée » une fois OK) :
+    `OrientationEngine` interroge `MoteurClient` (variables `MOTEUR_URL`, `MOTEUR_TOKEN`, `MOTEUR_SEUIL` dans `.env`) et se rabat sur les
+    mots-clés si le service Python est arrêté/incohérent ; `/api/orientation/tester` renvoie `source` (`ia` ou `mots_cles`).
+    Retour citoyen EF-18 : `POST /api/demandes/{id}/retour` `{"pertinent": true|false}` (champ `retourPertinent`, 409 si aucune recommandation).
+    Entité `ExempleOrientation` (1 par demande, texte anonymisé par `AnonymisationService` : e-mails, numéros de 6 chiffres ou plus,
+    nom/prénom du citoyen) alimentée par les réorientations d'agent (priorité) et les « oui » des citoyens (EF-19, EF-22).
+    Admin (EF-21) : `GET /api/admin/moteur` (état, métriques, résumé des exemples), `GET /api/admin/moteur/exemples`,
+    `DELETE /api/admin/moteur/exemples/{id}`, `POST /api/admin/moteur/reentrainer`. Journal : `retour_orientation`,
+    `exemple_supprime`, `moteur_reentraine`. Non fait : `ExempleOrientation` n'est pas encore utilisé dans les statistiques de
+    « bonne orientation » (qui reposent sur les réorientations, pas sur `retourPertinent`).
+
 Reste à faire, dans cet ordre :
-5. Moteur d'orientation (non bloquant)
-6. Tests des accès par rôle (PHPUnit) + OpenAPI
-7. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
+5. Tests des accès par rôle (PHPUnit) + OpenAPI
+6. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
    responsable/* (dont statistiques et export CSV), admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
    agent/demandes, prendre-rendez-vous, mes-rendez-vous, agent/rendez-vous, catalogue)
-8. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
-9. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
+7. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
+8. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
     pour que ça ressemble à un vrai site web), puis version Android de l'application mobile.
     Claude doit aider pour le déploiement et pour l'app Android.
 

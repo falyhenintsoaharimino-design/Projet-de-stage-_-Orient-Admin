@@ -1,0 +1,223 @@
+{
+  "date": "2026-10-19T22:44:11+00:00",
+  "seuil": 0.3,
+  "nbExemplesEntrainement": 270,
+  "nbDemandesTest": 207,
+  "precisionPremiere": 0.971,
+  "precisionTop3": 1.0,
+  "demandesValidesSousLeSeuil": 4,
+  "horsSujet": {
+    "total": 20,
+    "rejetes": 13,
+    "tauxRejet": 0.65
+  },
+  "parService": {
+    "Centre fiscal": {
+      "precision": 0.92,
+      "recall": 1.0,
+      "f1-score": 0.958,
+      "support": 23.0
+    },
+    "Fokontany": {
+      "precision": 0.957,
+      "recall": 0.957,
+      "f1-score": 0.957,
+      "support": 23.0
+    },
+    "Greffe du tribunal - casier judiciaire": {
+      "precision": 0.957,
+      "recall": 0.957,
+      "f1-score": 0.957,
+      "support": 23.0
+    },
+    "Guichet unique de création d'entreprise": {
+      "precision": 1.0,
+      "recall": 0.957,
+      "f1-score": 0.978,
+      "support": 23.0
+    },
+    "Service de l'urbanisme et du foncier": {
+      "precision": 0.957,
+      "recall": 0.957,
+      "f1-score": 0.957,
+      "support": 23.0
+    },
+    "Service de l'état civil": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 23.0
+    },
+    "Service des cartes d'identité nationales": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 23.0
+    },
+    "Service des passeports": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 23.0
+    },
+    "Service des transports": {
+      "precision": 0.955,
+      "recall": 0.913,
+      "f1-score": 0.933,
+      "support": 23.0
+    }
+  },
+  "f1Macro": 0.971,
+  "matriceConfusion": {
+    "labels": [
+      "Centre fiscal",
+      "Fokontany",
+      "Greffe du tribunal - casier judiciaire",
+      "Guichet unique de création d'entreprise",
+      "Service de l'urbanisme et du foncier",
+      "Service de l'état civil",
+      "Service des cartes d'identité nationales",
+      "Service des passeports",
+      "Service des transports"
+    ],
+    "valeurs": [
+      [
+        23,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        22,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        22,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        22,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        22,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        23,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        23,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        23,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        21
+      ]
+    ]
+  },
+  "erreurs": [
+    {
+      "texte": "attestation d'habitation",
+      "attendu": "Fokontany",
+      "obtenu": "Centre fiscal",
+      "confiance": 0.4379
+    },
+    {
+      "texte": "je veux prouver que je n'ai pas de condamnation",
+      "attendu": "Greffe du tribunal - casier judiciaire",
+      "obtenu": "Centre fiscal",
+      "confiance": 0.2372
+    },
+    {
+      "texte": "examen de conduite date",
+      "attendu": "Service des transports",
+      "obtenu": "Greffe du tribunal - casier judiciaire",
+      "confiance": 0.3285
+    },
+    {
+      "texte": "j'ai acheté un scooter démarches",
+      "attendu": "Service des transports",
+      "obtenu": "Service de l'urbanisme et du foncier",
+      "confiance": 0.2554
+    },
+    {
+      "texte": "changement de siège social",
+      "attendu": "Guichet unique de création d'entreprise",
+      "obtenu": "Fokontany",
+      "confiance": 0.2903
+    },
+    {
+      "texte": "demande d'immatriculation foncière",
+      "attendu": "Service de l'urbanisme et du foncier",
+      "obtenu": "Service des transports",
+      "confiance": 0.3432
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+# Jeu de test FIGÉ : ne sert qu'à mesurer le moteur (evaluer.py), jamais à l'entraîner
+# ni à régler ses paramètres. Une demande par ligne ; section hors_sujet = demandes
+# qui ne relèvent d'aucun service (le moteur doit alors se rabattre sur un message de repli).
+
+# etat_civil
+bonjour il me faut l'acte de naissance de mon neveu
+ou retirer un extrait d'acte de naissance
+mon fils est né hier je dois le déclarer
+je cherche l'acte de décès de mon grand père
+papiers pour un mariage à la commune urbaine
+copie de l'acte de mariage de mes parents
+livret de famille détérioré
+extrait de naissance pour passer le concours
+je veux la copie intégrale de mon acte
+déclaration de décès combien de jours
+acte de naissence introuvable
+comment recuperer mon acte de naissance
+naissance de mon petit enfant à enregistrer
+besoin d un acte de mariage pour la succession
+extrait d'acte de décès pour la banque
+jugement pour acte de naissance tardif
+mon nom est mal écrit sur l'acte de naissance
+état civil de la commune
+nouveau livret de famille après mariage
+acte de naissance légalisé pour l'étranger
+décès de mon oncle démarches
+je veux marier ma fille légalement
+demande d'extrait de naissance en ligne
+
+# cin
+renouveler la carte d'identité nationale expirée
+où faire ma cin
+ma carte d'identité a été volée au marché
+perte de la CIN comment la refaire
+dossier pour la première cin de ma fille
+duplicata de carte d'identité
+j'ai changé d'adresse je veux mettre à jour ma cin
+cin périmée depuis un an
+quels documents pour une carte nationale
+la photo de ma carte d'identité est effacée
+prix de la carte d identité
+combien de temps pour recevoir la cin
+mon fils vient d'avoir 18 ans carte d'identité
+cin mouillée illisible
+refaire la carte d'identité après mariage
+carte d'identité déchirée
+ou déposer la demande de cin
+carte nationale volée déclaration
+je veux faire une carte didentité
+cin pour une personne âgée
+bureau des cartes d'identité horaires
+changement d'état civil sur la cin
+ma cin est prête quand la retirer
+
+# fokontany
+attestation de résidence pour ma demande de cin
+je cherche un certificat de résidence
+il me faut une preuve de domicile
+papier du chef fokontany pour mon dossier
+certificat de residence urgent pour un emploi
+j'ai déménagé comment déclarer mon adresse
+attestation de domicile pour l'école
+le chef de fokontany est absent
+résidence certificat prix
+certificat de résidence pour ouvrir un compte
+qui signe le certificat de résidence
+je viens d'arriver dans le quartier papier de résidence
+attestation d'habitation
+demande d attestation de residence
+fiche de renseignement fokontany
+certificat de résidence depuis plus de six mois
+changer de fokontany après déménagement
+je veux un papier qui prouve que j'habite ici
+certificat de résidence pour mes enfants
+résidence à tana attestation
+quelle durée de validité du certificat de résidence
+papier fokontany pour le visa
+déclarer mon hébergé au fokontany
+
+# casier
+bulletin n3 pour un emploi
+casier judiciaire pour une demande de visa
+je voudrais mon casier judiciaire
+extrait de casier pour l'ambassade
+comment demander le casier au tribunal
+casier vierge attestation pour le travail
+demande de bulletin numéro 3
+besoin du casier judiciaire pour un concours
+greffe casier judiciaire horaires
+casier judiciaire délai de délivrance
+extrait de casier judiciare
+pièces pour avoir le bulletin n°3
+casier judiciaire pour adopter un enfant
+mon employeur demande un casier judiciaire
+antécédents judiciaires certificat
+casier pour dossier de naturalisation
+prix du bulletin n 3
+bulletin n3 pour un étranger
+copie du casier judiciaire perdue
+je veux prouver que je n'ai pas de condamnation
+casier judiciaire pour un stage
+document du greffe sur mon passé judiciaire
+demande en ligne de casier judiciaire
+
+# passeport
+renouveler mon passeport qui expire bientôt
+où faire un passeport
+première demande de passeport pour ma fille
+passeport perdu pendant le voyage
+quels papiers pour le passeport
+passeport pour partir étudier en france
+mon passeport est abîmé
+visa pour aller en chine
+je veux voyager il me faut un passeport
+combien coûte un passeport biométrique
+délai de fabrication du passeport
+retirer mon passeport prêt
+passeport volé déclaration
+pasport expiré
+rendez vous service des passeports
+passeport pour un bébé
+changer mon nom sur le passeport
+photos pour le passeport
+passeport pour un voyage professionnel
+demande de passeport en urgence
+nouveau passeport après mariage
+voyage à l'étranger autorisation de sortie
+passeport de mon père renouvellement
+
+# transports
+renouveler mon permis de conduire
+permis de conduire perdu duplicata
+je veux passer mon permis
+carte grise d'une voiture achetée
+immatriculer ma moto
+transfert de propriété d'une voiture carte grise
+perte carte grise
+inscription à l'auto école
+examen de conduite date
+visite technique obligatoire
+permis poids lourd conditions
+vignette moto paiement
+papiers du véhicule importé
+mon permi est expiré
+changement de plaque d'immatriculation
+carte grise pour véhicule d'occasion
+combien coûte la carte grise
+permis de conduire pour mon fils de 18 ans
+duplicata carte grise perdue
+j'ai acheté un scooter démarches
+permis taxi brousse
+contrôle technique camion
+validité du permis de conduire
+
+# fiscal
+obtenir un nif
+je veux payer mes impôts
+déclaration d'impôt sur le revenu
+attestation de régularité fiscale pour un marché
+numéro d'identification fiscale entreprise
+où est le centre fiscal
+tva comment la déclarer
+impôt synthétique pour mon petit commerce
+quitus fiscal délai
+je dois déclarer mes revenus
+taxe sur les véhicules paiement
+réclamation impôt trop élevé
+formulaire de déclaration fiscale
+nif perdu
+rendez vous avec l'inspecteur des impôts
+paiement de la taxe professionnelle
+délai pour déclarer ses impots
+exonération de taxe
+je n'arrive pas à payer mes impôts facilités
+déclarer les impôts de ma société
+numéro fiscal pour la banque
+amende pour retard de déclaration
+qui doit payer l'impôt synthétique
+
+# entreprise
+créer ma société
+comment immatriculer mon entreprise au registre du commerce
+je veux ouvrir une sarl
+guichet unique création entreprise antananarivo
+statuts de société modèle
+démarches pour créer une startup
+extrait du registre du commerce
+radiation d'une entreprise
+modifier le capital de ma société
+ouvrir un restaurant quelles formalités
+combien de temps pour créer une entreprise
+je veux devenir entrepreneur
+inscription rcs
+création d'une société unipersonnelle
+edbm formalités
+déposer les statuts de ma société
+quels sont les frais de création d'entreprise
+enregistrer mon activité commerciale
+changement de siège social
+numéro rcs perdu
+transformer mon entreprise individuelle en société
+ouvrir une société de transport
+je veux monter une petite entreprise de couture
+
+# foncier
+titre foncier pour mon terrain
+permis de construire pour ma maison
+j'ai hérité d'un terrain démarches
+plan cadastral de ma parcelle
+mutation du titre foncier après vente
+bornage de mon terrain
+demande d'immatriculation foncière
+autorisation de construire un étage
+règles d'urbanisme zone
+certificat de situation juridique d'un terrain
+litige foncier voisin
+acte de vente terrain où enregistrer
+je veux construire un immeuble de rapport
+mon terrain n'est pas immatriculé
+service des domaines
+division de mon terrain en deux
+certificat de propriété foncière
+renseignements fonciers
+régularisation de construction sans permis
+hypothèque sur mon terrain
+vérifier le titre d'un terrain avant d'acheter
+terrain constructible à tana
+copie du titre foncier perdu
+
+# hors_sujet
+quel temps fera-t-il demain
+je cherche un bon restaurant à antananarivo
+comment réparer mon téléphone
+résultats du match de foot
+recette du ravitoto
+bonjour
+je suis fatigué
+combien coûte un billet d'avion pour paris
+comment apprendre l'anglais
+où acheter un ordinateur portable
+asdfgh qwerty
+je veux perdre du poids
+blague drôle
+hôpital pour une urgence médicale
+trouver du travail dans le tourisme
+inscription à l'université
+horaires du bus
+mon voisin fait du bruit
+comment faire un gâteau
+cours de guitare

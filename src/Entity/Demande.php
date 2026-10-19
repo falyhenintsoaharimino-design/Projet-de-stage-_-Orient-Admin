@@ -28,6 +28,10 @@ class Demande
     #[ORM\Column(nullable: true)]
     private ?float $confiance = null;
 
+    /** Retour du citoyen : la recommandation du moteur était-elle pertinente ? (null = pas de retour) */
+    #[ORM\Column(nullable: true)]
+    private ?bool $retourPertinent = null;
+
     #[ORM\ManyToOne(inversedBy: 'demandes')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Utilisateur $utilisateur = null;
@@ -98,6 +102,18 @@ class Demande
     public function setConfiance(?float $confiance): static
     {
         $this->confiance = $confiance;
+
+        return $this;
+    }
+
+    public function getRetourPertinent(): ?bool
+    {
+        return $this->retourPertinent;
+    }
+
+    public function setRetourPertinent(?bool $retourPertinent): static
+    {
+        $this->retourPertinent = $retourPertinent;
 
         return $this;
     }

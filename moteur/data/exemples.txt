@@ -1,0 +1,291 @@
+# Exemples d'entraînement : une section par service (clé définie dans services.json).
+# Une demande par ligne. Les lignes commençant par # sont ignorées.
+# Le jeu de test (test.txt) est distinct et ne sert jamais à régler le moteur.
+
+# etat_civil
+je veux un acte de naissance pour mon fils
+comment obtenir un extrait de naissance
+il me faut une copie de mon acte de naissance
+acte de naissance perdu que faire
+mon bébé vient de naître où déclarer la naissance
+demande d'acte de décès pour mon père
+je dois déclarer un décès dans la famille
+acte de mariage pour mon dossier
+comment faire un extrait d'acte de mariage
+je veux me marier à la commune quels papiers
+copie intégrale d'acte de naissance
+extrait de naissance pour inscription scolaire
+livret de famille perdu
+je veux faire un livret de famille
+déclarer la naissance de ma fille
+certificat de décès et acte pour la succession
+acte de naissance de ma femme pour le visa
+legalisation d'un acte de naissance
+rectification d'un nom sur mon acte de naissance
+je ne trouve plus mon extrait de naissance
+acte de naisance pour le bac
+mariage civil à la mairie
+papiers pour reconnaître mon enfant
+duplicata acte de naissance
+extrait d'état civil
+ou faire enregistrer un décès
+acte de naissance numérique
+ma maman est décédée il faut un acte
+naissance non déclarée depuis longtemps jugement supplétif
+acte d etat civil pour la banque
+
+# cin
+je veux faire ma carte d'identité
+renouvellement de ma CIN
+j'ai perdu ma carte d'identité nationale
+duplicata de la cin
+première carte d'identité pour mon fils de 18 ans
+ma carte d'identité est expirée
+comment avoir la CIN
+carte d'identité volée que faire
+changer l'adresse sur ma carte d'identité
+cin abimée à remplacer
+documents pour la carte d'identité nationale
+je dois refaire ma cin
+où déposer le dossier de carte d'identité
+combien coûte la carte d'identité
+délai pour obtenir la cin
+carte nationale d'identité nouvelle
+perte cin déclaration
+ma cin est illisible
+changement de nom sur la carte d'identité
+carte didentité pour mineur
+refaire mes papiers d'identité
+identité nationale renouveler
+cin pour voter
+mon enfant a 18 ans il lui faut une cin
+mise à jour de ma carte d'identité
+photo pour la cin
+cin déchirée
+je cherche le bureau de la carte d'identité
+rendez vous pour ma carte d'identité
+retrait de la cin prête
+
+# fokontany
+je veux un certificat de résidence
+attestation de domicile
+il me faut un papier du fokontany
+certificat de résidence pour la cin
+comment obtenir une attestation de résidence
+je viens d'emménager je dois déclarer ma résidence
+quittance et certificat de résidence
+chef fokontany signature
+certificat de vie et de résidence
+attestation de résidence pour un emploi
+papier de résidence pour l'école de mon enfant
+demande de certificat de residence
+je dois prouver mon adresse
+certificat de domicile
+papier du quartier pour ma demande
+je veux un certificat de résidence pour ma banque
+fokontany de mon quartier
+résidence depuis 5 ans attestation
+déclarer un nouvel habitant dans le fokontany
+certificat de résidence perdu
+j habite à antananarivo il me faut un certificat de résidence
+signature du chef de quartier
+fiche de résidence
+changement de fokontany
+attestation de résidence pour mon dossier
+carnet de résidence
+certificat d'hébergement
+qui délivre le certificat de résidence
+tarif certificat de résidence
+papier de résidence urgent
+
+# casier
+je veux un casier judiciaire
+bulletin numéro 3 du casier judiciaire
+extrait de casier judiciaire pour un emploi
+comment obtenir le bulletin n3
+casier judiciaire pour le visa
+antécédents judiciaires attestation
+casier vierge pour mon dossier
+demande de casier judiciaire au tribunal
+bulletin n°3 pour candidature
+greffe du tribunal casier
+j'ai besoin d'un extrait de casier
+casier judiciaire pour concours
+document de moralité casier
+dossier de casier judiciaire pièces
+délai pour le casier judiciaire
+casier judiciaire de mon frère à l'étranger
+casier judiciare pour travailler
+certificat de bonne conduite
+extrait de casier pour la naturalisation
+combien coûte le casier judiciaire
+bulletin n 3 perdu
+casier judiciaire pour permis de port
+casier judiciaire en ligne
+bulletin numero 3 pour l'ambassade
+besoin du casier pour un contrat de travail
+je n'ai jamais été condamné attestation
+extrait du casier judiciaire national
+casier pour adoption
+renouveler le casier judiciaire
+demande bulletin n3 au greffe
+
+# passeport
+je veux faire un passeport
+renouvellement de passeport
+mon passeport est expiré
+passeport perdu déclaration
+première demande de passeport
+passeport pour mon enfant mineur
+comment obtenir un visa pour voyager
+je voyage à l'étranger quels papiers
+passeport biométrique
+délai pour avoir le passeport
+combien coûte un passeport
+passeport volé que faire
+passeport pour études à l'étranger
+rendez vous pour passeport
+dossier de passeport pièces à fournir
+pasport pour la france
+je pars en voyage il me faut un passeport
+visa pour l'europe
+changer les informations sur mon passeport
+passeport abimé
+retrait du passeport
+passeport d'urgence
+passeport ordinaire ou diplomatique
+photos d'identité pour passeport
+passeport de ma femme à renouveler
+voyage à maurice papiers nécessaires
+demande de visa de sortie
+page pleine dans mon passeport
+je cherche le service des passeports
+passeport expire dans deux mois
+
+# transports
+je veux passer le permis de conduire
+duplicata du permis de conduire
+permis de conduire perdu
+carte grise pour ma voiture
+immatriculation d'un véhicule
+changement de propriétaire carte grise
+j'ai acheté une moto comment l'immatriculer
+renouvellement du permis de conduire
+visite technique du véhicule
+carte grise perdue
+vignette automobile
+permis moto
+mon permis est expiré
+inscription auto école permis
+transfert de carte grise
+immatriculation d'une moto neuve
+duplicata de carte grise
+plaque d'immatriculation
+permis de conduire international
+examen du permis de conduire
+papiers du véhicule
+je veux conduire un taxi be licence
+conduire un camion permis poids lourd
+vehicule acheté d'occasion carte grise
+perte du permis de conduire
+permi de conduire pour ma fille
+contrôle technique voiture
+changer l'adresse sur la carte grise
+combien coûte le permis
+mutation de véhicule
+
+# fiscal
+je veux un nif
+numéro d'identification fiscale
+comment payer mes impôts
+déclaration fiscale annuelle
+attestation fiscale quitus
+impôt sur le revenu déclaration
+je dois payer la taxe
+taxe foncière paiement
+déclarer mes impôts en ligne
+obtenir mon nif pour mon activité
+centre fiscal le plus proche
+tva déclaration mensuelle
+impot synthétique petit commerce
+quitus fiscal pour un marché public
+attestation de régularité fiscale
+amende fiscale contestation
+je n'ai pas de nif
+délai de déclaration des impôts
+impots de mon entreprise
+calcul de l'impôt
+redressement fiscal
+nif pour ouvrir un compte pro
+réclamation sur ma taxe
+taxe d'habitation
+paiement des impôts sur les revenus
+numéro fiscal
+formulaire de déclaration d'impôt
+inspection des impôts rendez vous
+exonération fiscale demande
+declarer mes revenus au fisc
+
+# entreprise
+je veux créer une entreprise
+comment créer une société
+immatriculation au registre du commerce
+rcs pour mon activité
+guichet unique pour créer mon entreprise
+statuts d'une sarl
+je veux ouvrir un commerce
+création de société en ligne
+registre du commerce et des sociétés
+démarches pour monter ma startup
+capital minimum pour une société
+devenir entrepreneur individuel
+je veux monter mon business
+formalités de création d'entreprise
+edbm création
+modification des statuts de la société
+fermer mon entreprise radiation
+enregistrer ma boutique
+statut d'auto entrepreneur
+extrait rcs
+créer une association entreprise sociale
+quels papiers pour créer une sarl
+combien coûte la création d'une entreprise
+création d'entreprise délai
+déposer les statuts
+extrait kbis
+je veux lancer mon activité commerciale
+ouverture d'une société anonyme
+inscription au rcs
+creation de société à antananarivo
+
+# foncier
+je veux un titre foncier
+permis de construire
+j'ai acheté un terrain que faire
+cadastre plan de mon terrain
+mutation de propriété
+bornage de terrain
+demande de titre foncier pour ma parcelle
+construire une maison autorisation
+urbanisme règles de construction
+certificat de situation juridique du terrain
+conflit de terrain foncier
+acte de vente terrain immatriculation
+je veux construire un immeuble
+plan cadastral
+mon terrain n'a pas de titre
+service des domaines terrain
+autorisation de bâtir
+terrain hérité de mes parents titre
+division de parcelle
+certificat de propriété
+renseignement foncier
+agrandir ma maison permis
+domaine de l'état terrain
+hypothèque sur titre foncier
+je veux vérifier si mon terrain est titré
+construction sans permis régularisation
+guichet foncier
+transfert de propriété foncière
+terrain en zone constructible
+titre foncier perdu

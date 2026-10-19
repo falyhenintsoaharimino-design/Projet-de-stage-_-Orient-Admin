@@ -21,3 +21,11 @@
 ###> lexik/jwt-authentication-bundle ###
 /config/jwt/*.pem
 ###< lexik/jwt-authentication-bundle ###
+
+###> moteur (Python) ###
+/moteur/modele.joblib
+/moteur/.venv/
+/moteur/__pycache__/
+/moteur/tests/__pycache__/
+/moteur/.pytest_cache/
+###< moteur (Python) ###
