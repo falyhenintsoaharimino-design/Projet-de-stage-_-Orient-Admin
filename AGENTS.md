@@ -35,7 +35,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
   l'admin hérite des trois autres (`role_hierarchy`). Un agent est rattaché à un `Service`.
 - Services réutilisables : `NotificationService::notifier($utilisateur, $type, $sujet, $message)`
   (ligne en base + e-mail asynchrone), `JournalService::enregistrer($action, ?$utilisateur, ?$details)`
-  (audit, n'échoue jamais l'action métier), `RendezVousService`, `AvisService`, `OrientationEngine`.
+  (audit, n'échoue jamais l'action métier), `RendezVousService`, `AvisService`, `OrientationEngine`, `StatistiquesService` (lecture seule, SQL agrégé via DBAL).
 - Toute action sensible est journalisée via `JournalService` (noms d'actions en
   minuscules avec `_`, ex. `rdv_confirme`).
 - Windows est insensible à la casse mais pas Linux : les types d'entités doivent
@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 18/10/2026)
+### Avancement (mis à jour le 19/10/2026)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -58,16 +58,24 @@ Fait, testé et poussé :
   `POST /api/mot-de-passe/oublie` et `/reinitialiser` (lien signé HMAC, 1 h, usage unique, sans table) ;
   commande `php bin/console app:lien-reinitialisation <email> [--jeton] [--expire]` (tests) ; variable `APP_URL`.
   Le lien pointe vers `/pages/auth/reinitialiser-mot-de-passe.html?token=...` (page front à créer).
+- Étape 5 Statistiques + dashboard responsable + export CSV (`scripts/smoke-stats.sh`, aucune migration ;
+  recette à lancer chez l'étudiant, passer cette ligne en « testée » une fois OK) :
+  `/api/statistiques/{tableau-de-bord, demandes, rendez-vous, affluence, satisfaction, orientation}` et
+  `/api/statistiques/export?type=synthese|demandes|rendez-vous|avis` (CSV `;`, UTF-8 BOM), réservés au responsable
+  (admin inclus) ; filtres `du`, `au` (AAAA-MM-JJ, inclus), `serviceId`, `pas=jour|mois`. Export journalisé (`export_rapport`).
+  Définitions (voir `App\Service\StatistiquesService`) : « type » d'une demande = catégorie de son service ; bonne orientation =
+  recommandée par le moteur et non réorientée vers un autre service ; non comprise = moteur sollicité sans recommandation
+  (`confiance` renseignée, pas de `serviceRecommande`) ; choix du citoyen (confiance nulle) exclu des taux ; l'affluence compte
+  les rendez-vous en_attente/confirme/termine/absent. Non fait : temps d'attente estimé, export PDF/Excel natif (CSV ouvrable dans Excel).
 
 Reste à faire, dans cet ordre :
-5. Statistiques + dashboard responsable + export CSV
-6. Moteur d'orientation (non bloquant)
-7. Tests des accès par rôle (PHPUnit) + OpenAPI
-8. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
-   responsable/*, admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
+5. Moteur d'orientation (non bloquant)
+6. Tests des accès par rôle (PHPUnit) + OpenAPI
+7. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
+   responsable/* (dont statistiques et export CSV), admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
    agent/demandes, prendre-rendez-vous, mes-rendez-vous, agent/rendez-vous, catalogue)
-9. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
-10. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
+8. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
+9. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
     pour que ça ressemble à un vrai site web), puis version Android de l'application mobile.
     Claude doit aider pour le déploiement et pour l'app Android.
 
