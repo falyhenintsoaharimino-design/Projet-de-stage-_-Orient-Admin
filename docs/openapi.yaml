@@ -1,0 +1,2391 @@
+openapi: 3.0.3
+info:
+  title: Orient-Admin — API REST
+  version: 1.0.0
+  description: 'API du système d''orientation des citoyens vers les services administratifs.
+
+
+    Authentification : `POST /api/login_check` renvoie un jeton JWT à envoyer dans l''en-tête `Authorization: Bearer <jeton>`.
+
+
+    Rôles : `citoyen`, `agent`, `responsable`, `admin`. L''admin hérite des trois autres ; l''agent et le responsable ne s''héritent
+    pas entre eux.
+
+
+    Erreurs : corps JSON `{"error": "message"}`. Les routes marquées « rôles autorisés » répondent 401 sans jeton valide et
+    403 si le rôle ne suffit pas (vérifié par `tests/Controller/AccesParRoleTest.php`).'
+servers:
+- url: http://127.0.0.1:8000
+  description: Serveur local
+tags:
+- name: Authentification
+- name: Orientation
+- name: Services
+- name: Procédures
+- name: Demandes
+- name: Créneaux
+- name: Rendez-vous
+- name: Avis
+- name: Notifications
+- name: Statistiques
+- name: Journal
+- name: Administration
+- name: Moteur d'orientation
+paths:
+  /api/login_check:
+    post:
+      tags:
+      - Authentification
+      summary: 'Connexion : renvoie un jeton JWT'
+      description: Réponse 401 si identifiants incorrects ou compte désactivé.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+              required:
+              - email
+              - password
+      security: []
+      responses:
+        '200':
+          description: Jeton JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+  /api/register:
+    post:
+      tags:
+      - Authentification
+      summary: Inscription d'un citoyen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                prenom:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+              required:
+              - nom
+              - email
+              - password
+      security: []
+      responses:
+        '201':
+          description: Compte créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurResume'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/me:
+    get:
+      tags:
+      - Authentification
+      summary: Profil de l'utilisateur connecté
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Profil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Moi'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  /api/mot-de-passe/oublie:
+    post:
+      tags:
+      - Authentification
+      summary: Demande de lien de réinitialisation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+              required:
+              - email
+      security: []
+      responses:
+        '202':
+          description: Réponse identique que le compte existe ou non
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/mot-de-passe/reinitialiser:
+    post:
+      tags:
+      - Authentification
+      summary: Réinitialisation du mot de passe avec le jeton reçu par e-mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+              required:
+              - token
+              - password
+      security: []
+      responses:
+        '200':
+          description: Mot de passe modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/orientation/tester:
+    post:
+      tags:
+      - Orientation
+      summary: Teste le moteur d'orientation sur un texte (sans créer de demande)
+      description: Public. `source` vaut `ia` (service Python) ou `mots_cles` (repli).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                texte:
+                  type: string
+              required:
+              - texte
+      security: []
+      responses:
+        '200':
+          description: Recommandation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Orientation'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/services:
+    get:
+      tags:
+      - Services
+      summary: Liste des services
+      security: []
+      responses:
+        '200':
+          description: Services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+    post:
+      tags:
+      - Services
+      summary: Crée un service
+      description: 'Rôles autorisés : admin.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                mission:
+                  type: string
+                categorie:
+                  type: string
+                adresse:
+                  type: string
+                horaires:
+                  type: string
+                contact:
+                  type: string
+                actif:
+                  type: boolean
+                motsCles:
+                  type: string
+              required:
+              - nom
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/services/{id}:
+    get:
+      tags:
+      - Services
+      summary: Détail d'un service
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security: []
+      responses:
+        '200':
+          description: Service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    put:
+      tags:
+      - Services
+      summary: Modifie un service (champs envoyés uniquement)
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                mission:
+                  type: string
+                categorie:
+                  type: string
+                adresse:
+                  type: string
+                horaires:
+                  type: string
+                contact:
+                  type: string
+                actif:
+                  type: boolean
+                motsCles:
+                  type: string
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Service modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    delete:
+      tags:
+      - Services
+      summary: Supprime un service
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Supprimé
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/procedures:
+    get:
+      tags:
+      - Procédures
+      summary: Liste des procédures
+      parameters:
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+        description: Filtre par service
+      security: []
+      responses:
+        '200':
+          description: Procédures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Procedure'
+    post:
+      tags:
+      - Procédures
+      summary: Crée une procédure
+      description: 'Rôles autorisés : admin.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                serviceId:
+                  type: integer
+                nom:
+                  type: string
+                description:
+                  type: string
+                delaiEstime:
+                  type: string
+                frais:
+                  type: string
+                version:
+                  type: string
+              required:
+              - serviceId
+              - nom
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Procedure'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/procedures/{id}:
+    get:
+      tags:
+      - Procédures
+      summary: Détail d'une procédure
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security: []
+      responses:
+        '200':
+          description: Procédure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Procedure'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    put:
+      tags:
+      - Procédures
+      summary: Modifie une procédure
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                serviceId:
+                  type: integer
+                nom:
+                  type: string
+                description:
+                  type: string
+                delaiEstime:
+                  type: string
+                frais:
+                  type: string
+                version:
+                  type: string
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Procédure modifiée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Procedure'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    delete:
+      tags:
+      - Procédures
+      summary: Supprime une procédure
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Supprimée
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/demandes:
+    post:
+      tags:
+      - Demandes
+      summary: Crée une demande (orientation automatique, ou service choisi)
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                texte:
+                  type: string
+                serviceId:
+                  type: integer
+                  description: 'Optionnel : service choisi par le citoyen'
+              required:
+              - texte
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Demande créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Demande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    get:
+      tags:
+      - Demandes
+      summary: Liste des demandes (les siennes ; toutes pour agent, responsable et admin)
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Demandes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Demande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  /api/demandes/{id}:
+    get:
+      tags:
+      - Demandes
+      summary: Détail d'une demande
+      description: '403 si la demande n''est pas accessible à l''utilisateur. Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Demande
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Demande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/demandes/{id}/reorienter:
+    patch:
+      tags:
+      - Demandes
+      summary: Réoriente une demande vers un autre service (EF-19)
+      description: 'Rôles autorisés : agent, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                serviceId:
+                  type: integer
+              required:
+              - serviceId
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Demande réorientée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Demande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/demandes/{id}/retour:
+    post:
+      tags:
+      - Demandes
+      summary: 'Retour du citoyen : le service recommandé était-il le bon ? (EF-18)'
+      description: '403 si la demande appartient à un autre citoyen. 409 si le moteur n''a fait aucune recommandation. Rôles
+        autorisés : citoyen, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pertinent:
+                  type: boolean
+              required:
+              - pertinent
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Retour enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Demande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+        '422':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/demandes/{id}/statut:
+    patch:
+      tags:
+      - Demandes
+      summary: Change le statut d'une demande
+      description: 'Rôles autorisés : agent, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statut:
+                  type: string
+                  enum:
+                  - soumise
+                  - orientee
+                  - rendez_vous_pris
+                  - en_traitement
+                  - cloturee
+                  - annulee
+              required:
+              - statut
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Demande modifiée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Demande'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/creneaux:
+    get:
+      tags:
+      - Créneaux
+      summary: Liste des créneaux (disponibles seulement pour les citoyens)
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: date
+        in: query
+        schema:
+          type: string
+          format: date
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Créneaux
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Creneau'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+    post:
+      tags:
+      - Créneaux
+      summary: Crée des créneaux
+      description: '`heure` (une seule) est accepté à la place de `heures`. Rôles autorisés : agent, admin.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  format: date
+                heures:
+                  type: array
+                  items:
+                    type: string
+                serviceId:
+                  type: integer
+                  description: Admin seulement
+              required:
+              - date
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Créneaux créés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  crees:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Creneau'
+                  ignores:
+                    type: array
+                    items: {}
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/creneaux/{id}:
+    patch:
+      tags:
+      - Créneaux
+      summary: Ouvre ou ferme un créneau
+      description: 'Rôles autorisés : agent, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disponible:
+                  type: boolean
+              required:
+              - disponible
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Créneau modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Creneau'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+    delete:
+      tags:
+      - Créneaux
+      summary: Supprime un créneau non réservé
+      description: 'Rôles autorisés : agent, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Supprimé
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/rendez-vous:
+    post:
+      tags:
+      - Rendez-vous
+      summary: Réserve un rendez-vous
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                demandeId:
+                  type: integer
+                creneauId:
+                  type: integer
+              required:
+              - demandeId
+              - creneauId
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Rendez-vous créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+    get:
+      tags:
+      - Rendez-vous
+      summary: Liste des rendez-vous (selon le rôle)
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RendezVous'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  /api/rendez-vous/{id}:
+    get:
+      tags:
+      - Rendez-vous
+      summary: Détail d'un rendez-vous
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/rendez-vous/{id}/annuler:
+    patch:
+      tags:
+      - Rendez-vous
+      summary: Annule un rendez-vous
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous annulé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/rendez-vous/{id}/decision:
+    patch:
+      tags:
+      - Rendez-vous
+      summary: Confirme ou refuse un rendez-vous
+      description: 'Rôles autorisés : agent, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - confirmer
+                  - refuser
+              required:
+              - decision
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/rendez-vous/{id}/statut:
+    patch:
+      tags:
+      - Rendez-vous
+      summary: Clôture un rendez-vous confirmé
+      description: 'Rôles autorisés : agent, admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statut:
+                  type: string
+                  enum:
+                  - termine
+                  - absent
+              required:
+              - statut
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/avis:
+    post:
+      tags:
+      - Avis
+      summary: Donne un avis sur un rendez-vous terminé
+      description: 'Rôles autorisés : citoyen, admin.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rendezVousId:
+                  type: integer
+                note:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                commentaire:
+                  type: string
+              required:
+              - rendezVousId
+              - note
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Avis créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Avis'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+    get:
+      tags:
+      - Avis
+      summary: Liste des avis (selon le rôle)
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - name: note
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 5
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Avis
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Avis'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/avis/rendez-vous/{id}:
+    get:
+      tags:
+      - Avis
+      summary: Avis d'un rendez-vous
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Avis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Avis'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/notifications:
+    get:
+      tags:
+      - Notifications
+      summary: Mes notifications
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - name: nonLues
+        in: query
+        schema:
+          type: boolean
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  /api/notifications/compteur:
+    get:
+      tags:
+      - Notifications
+      summary: Nombre de notifications non lues
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Compteur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nonLues:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  /api/notifications/lu-tout:
+    patch:
+      tags:
+      - Notifications
+      summary: Marque toutes mes notifications comme lues
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Nombre marquées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  marquees:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+  /api/notifications/{id}/lu:
+    patch:
+      tags:
+      - Notifications
+      summary: Marque une notification comme lue
+      description: 'Rôles autorisés : tout utilisateur connecté.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Notification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/tableau-de-bord:
+    get:
+      tags:
+      - Statistiques
+      summary: Tableau de bord du responsable
+      description: 'Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Statistiques (objet JSON, voir StatistiquesService)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/demandes:
+    get:
+      tags:
+      - Statistiques
+      summary: Statistiques des demandes
+      description: 'Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Statistiques (objet JSON, voir StatistiquesService)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/rendez-vous:
+    get:
+      tags:
+      - Statistiques
+      summary: Statistiques des rendez-vous
+      description: 'Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Statistiques (objet JSON, voir StatistiquesService)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/affluence:
+    get:
+      tags:
+      - Statistiques
+      summary: Affluence
+      description: 'Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Statistiques (objet JSON, voir StatistiquesService)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/satisfaction:
+    get:
+      tags:
+      - Statistiques
+      summary: Satisfaction (avis)
+      description: 'Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Statistiques (objet JSON, voir StatistiquesService)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/orientation:
+    get:
+      tags:
+      - Statistiques
+      summary: Qualité de l'orientation
+      description: 'Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Statistiques (objet JSON, voir StatistiquesService)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/statistiques/export:
+    get:
+      tags:
+      - Statistiques
+      summary: Export CSV (séparateur « ; », UTF-8 avec BOM)
+      description: 'Export journalisé (`export_rapport`). Rôles autorisés : responsable, admin.'
+      parameters:
+      - name: type
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - synthese
+          - demandes
+          - rendez-vous
+          - avis
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+          - csv
+          default: csv
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-JJ, inclus
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: pas
+        in: query
+        schema:
+          type: string
+          enum:
+          - jour
+          - mois
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Fichier CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/journal:
+    get:
+      tags:
+      - Journal
+      summary: Journal d'audit (paginé)
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - name: action
+        in: query
+        schema:
+          type: string
+      - name: utilisateurId
+        in: query
+        schema:
+          type: integer
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: limite
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Page du journal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Journal'
+                  page:
+                    type: integer
+                  limite:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+  /api/journal/actions:
+    get:
+      tags:
+      - Journal
+      summary: Actions déjà enregistrées (pour un filtre)
+      description: 'Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/admin/roles:
+    get:
+      tags:
+      - Administration
+      summary: Liste des rôles
+      description: 'Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rôles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    nom:
+                      type: string
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/admin/utilisateurs:
+    get:
+      tags:
+      - Administration
+      summary: Liste des utilisateurs (filtrée, paginée)
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - name: role
+        in: query
+        schema:
+          type: string
+      - name: serviceId
+        in: query
+        schema:
+          type: integer
+      - name: actif
+        in: query
+        schema:
+          type: boolean
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+      - name: limite
+        in: query
+        schema:
+          type: integer
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Page d'utilisateurs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UtilisateurAdmin'
+                  page:
+                    type: integer
+                  limite:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+    post:
+      tags:
+      - Administration
+      summary: Crée un utilisateur
+      description: 'Rôles autorisés : admin.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                prenom:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                role:
+                  type: string
+                serviceId:
+                  type: integer
+              required:
+              - nom
+              - email
+              - password
+              - role
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Utilisateur créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurAdmin'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/admin/utilisateurs/{id}:
+    get:
+      tags:
+      - Administration
+      summary: Détail d'un utilisateur
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurAdmin'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    patch:
+      tags:
+      - Administration
+      summary: Modifie un utilisateur (champs envoyés uniquement)
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                prenom:
+                  type: string
+                email:
+                  type: string
+                role:
+                  type: string
+                serviceId:
+                  type: integer
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Utilisateur modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurAdmin'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/admin/utilisateurs/{id}/actif:
+    patch:
+      tags:
+      - Administration
+      summary: Active ou désactive un compte
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actif:
+                  type: boolean
+              required:
+              - actif
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilisateurAdmin'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+  /api/admin/moteur:
+    get:
+      tags:
+      - Moteur d'orientation
+      summary: État du service Python, métriques et résumé des exemples
+      description: 'Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: État
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/admin/moteur/exemples:
+    get:
+      tags:
+      - Moteur d'orientation
+      summary: Exemples d'apprentissage (paginés)
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - name: origine
+        in: query
+        schema:
+          type: string
+          enum:
+          - reorientation
+          - retour_citoyen
+      - name: page
+        in: query
+        schema:
+          type: integer
+      - name: limite
+        in: query
+        schema:
+          type: integer
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Page d'exemples
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    type: integer
+                  limite:
+                    type: integer
+                  total:
+                    type: integer
+                  pages:
+                    type: integer
+                  exemples:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Exemple'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/admin/moteur/exemples/{id}:
+    delete:
+      tags:
+      - Moteur d'orientation
+      summary: Supprime un exemple
+      description: 'Rôles autorisés : admin.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Supprimé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/admin/moteur/reentrainer:
+    post:
+      tags:
+      - Moteur d'orientation
+      summary: Réentraîne le moteur avec les exemples en base
+      description: '502 si le service Python est indisponible. Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Résultat du réentraînement (version, nbSupplementaires…)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '502':
+          description: Service d'orientation indisponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+  responses:
+    NonAuthentifie:
+      description: Jeton absent, invalide ou compte désactivé
+    Interdit:
+      description: Rôle insuffisant ou ressource d'un autre utilisateur
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+    RequeteInvalide:
+      description: Données invalides (400 ou 422)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+    Introuvable:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+    Conflit:
+      description: Action impossible dans l'état actuel (409)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+  schemas:
+    Erreur:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+      - error
+    Message:
+      type: object
+      properties:
+        message:
+          type: string
+    UtilisateurResume:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+    Moi:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        service:
+          type: integer
+          nullable: true
+    UtilisateurAdmin:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+          nullable: true
+        actif:
+          type: boolean
+    ServiceResume:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        adresse:
+          type: string
+          nullable: true
+        horaires:
+          type: string
+          nullable: true
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        mission:
+          type: string
+          nullable: true
+        categorie:
+          type: string
+          nullable: true
+        adresse:
+          type: string
+          nullable: true
+        horaires:
+          type: string
+          nullable: true
+        contact:
+          type: string
+          nullable: true
+        actif:
+          type: boolean
+        motsCles:
+          type: string
+          nullable: true
+    Procedure:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        description:
+          type: string
+          nullable: true
+        delaiEstime:
+          type: string
+          nullable: true
+        frais:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+        etapes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              ordre:
+                type: integer
+              description:
+                type: string
+        documentsRequis:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              libelle:
+                type: string
+              obligatoire:
+                type: boolean
+              remarque:
+                type: string
+                nullable: true
+    Orientation:
+      type: object
+      properties:
+        source:
+          type: string
+          enum:
+          - ia
+          - mots_cles
+        service:
+          $ref: '#/components/schemas/ServiceResume'
+          nullable: true
+        confiance:
+          type: number
+          nullable: true
+        alternatives:
+          type: array
+          items:
+            type: object
+            properties:
+              service:
+                $ref: '#/components/schemas/ServiceResume'
+              confiance:
+                type: number
+    Demande:
+      type: object
+      properties:
+        id:
+          type: integer
+        texte:
+          type: string
+        statut:
+          type: string
+        confiance:
+          type: number
+          nullable: true
+        retourPertinent:
+          type: boolean
+          nullable: true
+        dateCreation:
+          type: string
+          format: date-time
+        serviceRecommande:
+          $ref: '#/components/schemas/ServiceResume'
+          nullable: true
+        serviceFinal:
+          $ref: '#/components/schemas/ServiceResume'
+          nullable: true
+        citoyenId:
+          type: integer
+        citoyenNom:
+          type: string
+        citoyenPrenom:
+          type: string
+        alternatives:
+          type: array
+          items:
+            type: object
+            properties:
+              service:
+                $ref: '#/components/schemas/ServiceResume'
+              confiance:
+                type: number
+        historique:
+          type: array
+          items:
+            type: object
+            properties:
+              statut:
+                type: string
+              date:
+                type: string
+                format: date-time
+    Creneau:
+      type: object
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        heure:
+          type: string
+        disponible:
+          type: boolean
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+    RendezVous:
+      type: object
+      properties:
+        id:
+          type: integer
+        statut:
+          type: string
+          enum:
+          - en_attente
+          - confirme
+          - refuse
+          - annule
+          - termine
+          - absent
+        date:
+          type: string
+          format: date
+        heure:
+          type: string
+        creneauId:
+          type: integer
+        demande:
+          type: object
+          properties:
+            id:
+              type: integer
+            texte:
+              type: string
+            statut:
+              type: string
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+            adresse:
+              type: string
+              nullable: true
+        citoyenId:
+          type: integer
+        citoyenNom:
+          type: string
+        citoyenPrenom:
+          type: string
+    Avis:
+      type: object
+      properties:
+        id:
+          type: integer
+        note:
+          type: integer
+        commentaire:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date-time
+        rendezVousId:
+          type: integer
+        rendezVousDate:
+          type: string
+          format: date
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+        citoyenNom:
+          type: string
+        citoyenPrenom:
+          type: string
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        message:
+          type: string
+        statut:
+          type: string
+        lue:
+          type: boolean
+        date:
+          type: string
+          format: date-time
+    Journal:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        date:
+          type: string
+          format: date-time
+        adresseIp:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        utilisateur:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+            prenom:
+              type: string
+            email:
+              type: string
+          nullable: true
+    Exemple:
+      type: object
+      properties:
+        id:
+          type: integer
+        texte:
+          type: string
+        origine:
+          type: string
+        service:
+          type: object
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+        demandeId:
+          type: integer
+          nullable: true
+        dateCreation:
+          type: string
+          format: date-time

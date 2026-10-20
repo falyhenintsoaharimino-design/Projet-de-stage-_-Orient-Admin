@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 19/10/2026)
+### Avancement (mis à jour le 20/10/2026)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -71,8 +71,8 @@ Fait, testé et poussé :
   - Partie A (testée) : dossier `moteur/` (FastAPI + TF-IDF/scikit-learn, voir `moteur/README.md`) : `/orienter`, `/reentrainer`,
     `/metriques`, `/sante` ; 270 exemples d'entraînement, 207 demandes de test + 20 hors sujet ; jeton `X-Moteur-Token` ; services
     identifiés par leur nom exact. Lancement : `cd moteur`, venv, `pip install -r requirements.txt`, `python -m uvicorn app:app --port 8001`.
-  - Partie B (`scripts/smoke-moteur.sh`, `REPLI=1` pour tester sans le moteur Python ; migration `Version20261019120000` ;
-    recette à confirmer, passer en « testée » une fois OK) :
+  - Partie B (testée : `scripts/smoke-moteur.sh` en vert en mode normal et en mode `REPLI=1` (sans le moteur Python),
+    `doctrine:schema:validate` vert ; migration `Version20261019120000`) :
     `OrientationEngine` interroge `MoteurClient` (variables `MOTEUR_URL`, `MOTEUR_TOKEN`, `MOTEUR_SEUIL` dans `.env`) et se rabat sur les
     mots-clés si le service Python est arrêté/incohérent ; `/api/orientation/tester` renvoie `source` (`ia` ou `mots_cles`).
     Retour citoyen EF-18 : `POST /api/demandes/{id}/retour` `{"pertinent": true|false}` (champ `retourPertinent`, 409 si aucune recommandation).
@@ -83,8 +83,22 @@ Fait, testé et poussé :
     `exemple_supprime`, `moteur_reentraine`. Non fait : `ExempleOrientation` n'est pas encore utilisé dans les statistiques de
     « bonne orientation » (qui reposent sur les réorientations, pas sur `retourPertinent`).
 
+- Étape 5ter Tests des accès par rôle (PHPUnit) + documentation OpenAPI (aucune migration) :
+  - `tests/Controller/AccesParRoleTest.php` : pour statistiques, export CSV, administration du moteur, journal, utilisateurs admin,
+    réorientation et retour citoyen, vérifie sans jeton (401), citoyen / agent / responsable / admin (403 ou accès). Comptes
+    `phpunit-<rôle>@orient-admin.test` créés au besoin dans la base de TEST. `.env.test` vide `MOTEUR_URL` (pas de service Python).
+    Lancement : voir « Tests PHPUnit » ci-dessous. À confirmer : première exécution chez l'étudiant.
+  - `docs/openapi.yaml` (OpenAPI 3.0.3, 58 opérations, validé) ; `tests/Controller/OpenApiTest.php` échoue si une route `/api`
+    n'est pas documentée (ou l'inverse).
+  - Règle d'accès constatée : agent et responsable ne s'héritent pas (le responsable ne peut pas réorienter, l'agent n'a pas les statistiques) ;
+    l'admin a tout ; `retour` demande ROLE_CITOYEN (donc refusé à l'agent et au responsable).
+
+Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est PAS lu en environnement test) avec `DATABASE_URL`
+(même valeur que `.env.local`, le nom de base reçoit tout seul le suffixe `_test`) et `JWT_PASSPHRASE`. Puis, une fois :
+`php bin/console doctrine:database:create --env=test --if-not-exists`, `php bin/console doctrine:migrations:migrate --env=test --no-interaction` ;
+et à chaque fois : `php bin/phpunit`.
+
 Reste à faire, dans cet ordre :
-5. Tests des accès par rôle (PHPUnit) + OpenAPI
 6. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
    responsable/* (dont statistiques et export CSV), admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
    agent/demandes, prendre-rendez-vous, mes-rendez-vous, agent/rendez-vous, catalogue)
