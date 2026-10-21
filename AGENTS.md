@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 20/10/2026)
+### Avancement (mis à jour le 21/10/2026)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -98,12 +98,57 @@ Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est P
 `php bin/console doctrine:database:create --env=test --if-not-exists`, `php bin/console doctrine:migrations:migrate --env=test --no-interaction` ;
 et à chaque fois : `php bin/phpunit`.
 
-Reste à faire, dans cet ordre :
-6. Front : brancher agent/creneaux, donner-avis, notifications, profil, tableaux de bord,
-   responsable/* (dont statistiques et export CSV), admin/*, mot-de-passe-oublié (déjà branchés : auth, assistant, mes demandes,
-   agent/demandes, prendre-rendez-vous, mes-rendez-vous, agent/rendez-vous, catalogue)
-7. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel, rapport)
-8. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
+Reste à faire, dans cet ordre (décidé le 21/10/2026 après l'audit du backend et du front par rapport au cahier des charges) :
+
+Règle d'organisation : une discussion par étape (ou par rôle pour les revues), avec un résumé de passation précis en fin de
+discussion, pour économiser les tokens. Le backend est terminé et gelé AVANT la revue du front, la revue AVANT la refonte,
+la refonte AVANT la connexion. Rien n'est branché à l'API tant que l'étape 16 n'est pas faite.
+
+PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de recette, OpenAPI à jour, `doctrine:schema:validate`)
+6. Sécurité et comptes : limitation des tentatives de connexion (ENF-04, `login_throttling`) ; `PATCH /api/me` (profil) avec
+   téléphone, langue et canal de notification préféré (EF-01, EF-05) ; suppression du compte sur demande, consentement à l'inscription (case à cocher, date enregistrée) et export des données
+   personnelles du compte, `GET /api/me/donnees` (droit d'accès, ENF-05) ;
+   `GET /api/services` sans les services inactifs pour le public (l'admin voit tout) ; `DELETE /api/services/{id}` en suppression
+   logique (au lieu de la suppression définitive qui peut échouer) avec une réponse 204 sans corps.
+7. Catalogue et procédures : champs `source` et date de mise à jour/vérification sur chaque procédure (EF-09, ENF-13) ;
+   procédures, étapes et pièces modifiables par l'agent pour SON service, l'admin pour tous (EF-11, scénario S6) ; historique des
+   versions et suppression logique ; fiche du service modifiable par son agent ; recherche tolérante aux fautes et filtres par
+   rubrique sur services et procédures (EF-07, EF-12) ; pièces enrichies (nombre d'exemplaires, ancienneté maximale, où l'obtenir).
+8. Rendez-vous : créneaux avec durée, capacité et jours fermés, génération en lot (EF-23) ; modification d'un rendez-vous par le
+   citoyen et délai limite d'annulation (EF-26) ; report par l'agent (EF-27) ; récapitulatif de confirmation avec lieu et pièces
+   à apporter (EF-28).
+9. Notifications : rappel automatique la veille (commande `app:rappels-rdv` à planifier, EF-31) ; alerte pièces manquantes ou
+   changement de procédure (EF-32) ; SMS via un simulateur (EF-33) ; messages de l'agent vers le citoyen (page « communication »).
+10. Administration et recette finale du backend : paramètres (modèles de messages, jours fériés, durée par défaut, EF-46) ;
+   sauvegarde et restauration (EF-47, ENF-15) ; métriques du moteur comparées aux cibles 80 % (1re proposition) et 95 % (top 3),
+   écart expliqué si non atteint ; test de charge : assistant en 3 s ou moins pour 95 % des requêtes (ENF-01), 100 utilisateurs simultanés (ENF-02) ;
+   tableau de conformité EF/ENF ; script de recette des scénarios S1 à S9 ; relecture d'OpenAPI.
+   À la fin : le backend est GELÉ (plus de changement sans raison).
+
+PHASE 2 : revue du front, une discussion par rôle, sans brancher l'API (revoir chaque page : contenu, ergonomie, accessibilité
+WCAG 2.1 AA, responsive, besoins backend oubliés ; résultat : liste d'améliorations validée par l'étudiant, notée ici)
+11. Revue des pages de l'administrateur (tableau de bord, utilisateurs, sécurité-journal, services, base de connaissances,
+    moteur, paramètres)
+12. Revue des pages de l'agent
+13. Revue des pages du responsable
+14. Revue des pages du citoyen
+15. Revue des pages publiques et d'authentification (visiteur, connexion, inscription, mot de passe oublié, page de
+    réinitialisation à créer)
+
+PHASE 3 : refonte du front
+16. Nouveau logo et charte graphique, puis refonte complète du front (toutes les pages, une discussion par rôle) à partir des
+    revues des étapes 11 à 15 ; liste de contrôle des pièces cochable, imprimable ou exportable en PDF (EF-10) ;
+    PWA pour l'usage mobile (EF-48) ; textes externalisés pour ajouter le malagasy (ENF-08).
+
+PHASE 4 : connexion back-front (tout à la fin, sur le front refondu ; `api.js` complété : avis, notifications, retour citoyen,
+mot de passe, créneaux, statistiques, journal, admin, moteur, écritures sur services et procédures)
+17. a) auth, visiteur et citoyen ; b) agent ; c) responsable (statistiques, export CSV) ; d) admin. Déjà branchés avant la
+    refonte (à rebrancher) : auth, assistant, mes demandes, agent/demandes, prendre-rendez-vous, mes-rendez-vous,
+    agent/rendez-vous, catalogue. Un script `scripts/smoke-front-<rôle>.sh` par sous-étape.
+
+PHASE 5 : suite du projet
+18. Mobile Flutter (citoyen), puis documentation (UML, OpenAPI, manuel utilisateur, rapport).
+19. Une fois tout le site achevé : déploiement en ligne (hébergement et méthode à choisir avec Claude,
     pour que ça ressemble à un vrai site web), puis version Android de l'application mobile.
     Claude doit aider pour le déploiement et pour l'app Android.
 
