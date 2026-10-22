@@ -29,7 +29,14 @@ security:
                 username_path: email
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
-                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+                # Identique au gestionnaire Lexik, sauf « trop de tentatives » -> 429.
+                failure_handler: App\Security\LoginFailureHandler
+            # ENF-04 : au-delà de 5 échecs par minute pour un même e-mail et une même
+            # adresse IP (25 pour toute l'IP), la connexion répond 429. À passer à
+            # '15 minutes' au moment du déploiement (étape 19).
+            login_throttling:
+                max_attempts: 5
+                interval: '1 minute'
 
         api:
             pattern: ^/api

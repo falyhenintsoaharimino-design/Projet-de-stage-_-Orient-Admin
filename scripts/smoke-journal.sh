@@ -84,7 +84,7 @@ case "$BODY" in *mauvaisMDP-xyz*) ko "le mot de passe ne doit jamais être journ
 
 echo "== 5. Inscription =="
 NOUVEAU="recette-$RANDOM$RANDOM@test.com"
-api POST /api/register "" "{\"nom\":\"Recette\",\"prenom\":\"Journal\",\"email\":\"$NOUVEAU\",\"password\":\"motdepasse123\"}"; code_attendu "inscription" 201
+api POST /api/register "" "{\"nom\":\"Recette\",\"prenom\":\"Journal\",\"email\":\"$NOUVEAU\",\"password\":\"motdepasse123\",\"consentement\":true}"; code_attendu "inscription" 201
 delta inscription "$A_INSCR" 1 "inscription journalisée"
 api GET "/api/journal?action=inscription&limite=1" "$ADM"
 egal "inscription : rattachée au nouveau compte" "$(jget "$BODY" items.0.utilisateur.email)" "$NOUVEAU"

@@ -29,6 +29,7 @@ class AccesParRoleTest extends WebTestCase
     private const ADMIN = ['admin'];
     private const AGENT = ['agent', 'admin'];
     private const CITOYEN = ['citoyen', 'admin'];
+    private const TOUS = ['citoyen', 'agent', 'responsable', 'admin'];
 
     /** @var array<string, string> jetons déjà générés, un par compte */
     private static array $jetons = [];
@@ -70,6 +71,13 @@ class AccesParRoleTest extends WebTestCase
             // Réorientation (agent) et retour du citoyen
             ['PATCH', "/api/demandes/$id/reorienter", '{"serviceId":1}', self::AGENT, 404],
             ['POST', "/api/demandes/$id/retour", '{"pertinent":true}', self::CITOYEN, 404],
+            // Mon compte : profil (corps vide -> 400), export des données, suppression (citoyens seulement ;
+            // sans mot de passe -> 400, donc rien n'est supprimé)
+            ['PATCH', '/api/me', '{}', self::TOUS, 400],
+            ['GET', '/api/me/donnees', '', self::TOUS, 200],
+            ['DELETE', '/api/me', '{}', ['citoyen'], 400],
+            // Suppression logique d'un service (identifiant inconnu : rien n'est désactivé)
+            ['DELETE', "/api/services/$id", '', self::ADMIN, 404],
         ];
     }
 

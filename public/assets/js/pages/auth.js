@@ -45,7 +45,9 @@
       var email = document.getElementById("email").value.trim();
       var mdp = document.getElementById("mdp").value;
 
-      api.register(nom, prenom, email, mdp).then(function () {
+      var consentement = document.getElementById("consentement").checked;
+
+      api.register(nom, prenom, email, mdp, consentement).then(function () {
         // L'inscription ne connecte pas automatiquement : on enchaîne avec
         // une vraie connexion pour récupérer le jeton et le profil complet.
         return api.login(email, mdp);

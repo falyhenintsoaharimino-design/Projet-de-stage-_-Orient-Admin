@@ -18,7 +18,8 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * rdv_confirme, rdv_refuse, rdv_annule, rdv_termine, rdv_absent, avis_donne,
  * creneau_cree, creneau_modifie, creneau_supprime, utilisateur_cree,
  * utilisateur_modifie, utilisateur_active, utilisateur_desactive,
- * mdp_oublie_demande, mdp_reinitialise, export_rapport, retour_orientation, exemple_supprime, moteur_reentraine.
+ * mdp_oublie_demande, mdp_reinitialise, export_rapport, retour_orientation, exemple_supprime, moteur_reentraine,
+ * profil_modifie, donnees_exportees, compte_supprime, service_desactive.
  */
 class JournalService
 {

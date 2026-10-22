@@ -3,12 +3,16 @@
 namespace App\Controller;
 
 use App\Entity\Service;
+use App\Entity\Utilisateur;
 use App\Repository\ServiceRepository;
+use App\Service\JournalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/services')]
@@ -17,13 +21,17 @@ class ServiceApiController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ServiceRepository $serviceRepository,
+        private JournalService $journal,
     ) {
     }
 
     #[Route('', name: 'api_services_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
-        $services = $this->serviceRepository->findAll();
+        // Le public ne voit que les services actifs ; l'admin voit tout (jeton facultatif sur cette route).
+        $services = $this->isGranted('ROLE_ADMIN')
+            ? $this->serviceRepository->findBy([], ['id' => 'ASC'])
+            : $this->serviceRepository->findBy(['actif' => true], ['id' => 'ASC']);
 
         $data = array_map(fn(Service $s) => $this->toArray($s), $services);
 
@@ -35,7 +43,7 @@ class ServiceApiController extends AbstractController
     {
         $service = $this->serviceRepository->find($id);
 
-        if (!$service) {
+        if (!$service || (!$service->isActif() && !$this->isGranted('ROLE_ADMIN'))) {
             return $this->json(['error' => 'Service non trouvé'], 404);
         }
 
@@ -92,7 +100,7 @@ class ServiceApiController extends AbstractController
 
     #[Route('/{id}', name: 'api_services_delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    public function delete(int $id): JsonResponse
+    public function delete(int $id, #[CurrentUser] ?Utilisateur $admin): Response
     {
         $service = $this->serviceRepository->find($id);
 
@@ -100,10 +108,13 @@ class ServiceApiController extends AbstractController
             return $this->json(['error' => 'Service non trouvé'], 404);
         }
 
-        $this->em->remove($service);
+        // Suppression logique : le service est désactivé (les demandes, rendez-vous et statistiques
+        // qui s'y rattachent restent intacts) ; l'admin peut le réactiver avec PUT {"actif": true}.
+        $service->setActif(false);
         $this->em->flush();
+        $this->journal->enregistrer('service_desactive', $admin, 'service=' . $id);
 
-        return $this->json(['message' => 'Service supprimé'], 204);
+        return new Response(null, Response::HTTP_NO_CONTENT);
     }
 
     private function toArray(Service $service): array

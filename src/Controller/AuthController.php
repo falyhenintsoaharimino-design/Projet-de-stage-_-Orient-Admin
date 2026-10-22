@@ -6,6 +6,7 @@ use App\Entity\Role;
 use App\Entity\Utilisateur;
 use App\Repository\RoleRepository;
 use App\Repository\UtilisateurRepository;
+use App\Service\CompteService;
 use App\Service\JournalService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,7 @@ class AuthController extends AbstractController
         private RoleRepository $roleRepository,
         private UserPasswordHasherInterface $passwordHasher,
         private JournalService $journal,
+        private CompteService $compte,
     ) {
     }
 
@@ -44,6 +46,21 @@ class AuthController extends AbstractController
 
         if ($nom === '' || $email === '' || $password === '') {
             return $this->json(['error' => 'nom, email et password sont requis'], 400);
+        }
+
+        if (mb_strlen($nom) > 100 || mb_strlen($prenom) > 100 || mb_strlen($email) > 180 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $this->json(['error' => 'E-mail invalide ou nom/prénom trop longs (100 caractères au plus)'], 400);
+        }
+
+        // ENF-05 : finalité annoncée et consentement explicite (case à cocher côté front).
+        if (($data['consentement'] ?? null) !== true) {
+            return $this->json(['error' => 'Le consentement au traitement des données personnelles est requis (consentement: true)'], 400);
+        }
+
+        try {
+            $telephone = $this->compte->normaliserTelephone($data['telephone'] ?? null);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode());
         }
 
         if (strlen($password) < 8) {
@@ -67,6 +84,8 @@ class AuthController extends AbstractController
         $utilisateur->setPrenom($prenom !== '' ? $prenom : $nom);
         $utilisateur->setEmail($email);
         $utilisateur->setRole($role);
+        $utilisateur->setTelephone($telephone);
+        $utilisateur->setConsentementLe(new \DateTimeImmutable());
         $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $password));
 
         $this->em->persist($utilisateur);
@@ -89,13 +108,6 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Non authentifié'], 401);
         }
 
-        return $this->json([
-            'id' => $utilisateur->getId(),
-            'nom' => $utilisateur->getNom(),
-            'prenom' => $utilisateur->getPrenom(),
-            'email' => $utilisateur->getEmail(),
-            'roles' => $utilisateur->getRoles(),
-            'service' => $utilisateur->getService()?->getId(),
-        ]);
+        return $this->json($this->compte->profil($utilisateur));
     }
 }

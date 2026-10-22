@@ -37,7 +37,8 @@ paths:
       tags:
       - Authentification
       summary: 'Connexion : renvoie un jeton JWT'
-      description: Réponse 401 si identifiants incorrects ou compte désactivé.
+      description: 'Réponse 401 si identifiants incorrects ou compte désactivé. Limitation des tentatives (ENF-04) : au-delà de
+        5 échecs par minute pour un même e-mail et une même adresse IP, réponse 429 avec l''en-tête `Retry-After` (secondes).'
       requestBody:
         required: true
         content:
@@ -63,11 +64,24 @@ paths:
                 properties:
                   token:
                     type: string
+        '429':
+          description: Trop de tentatives de connexion
+          headers:
+            Retry-After:
+              description: Secondes à attendre avant de réessayer
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
   /api/register:
     post:
       tags:
       - Authentification
       summary: Inscription d'un citoyen
+      description: 'Le consentement au traitement des données personnelles est obligatoire (`consentement: true`) ; sa date est
+        enregistrée (ENF-05).'
       requestBody:
         required: true
         content:
@@ -84,10 +98,17 @@ paths:
                 password:
                   type: string
                   minLength: 8
+                telephone:
+                  type: string
+                  description: Facultatif ; 6 à 15 chiffres, « + » au début accepté (espaces, points et tirets retirés).
+                consentement:
+                  type: boolean
+                  description: Doit valoir true.
               required:
               - nom
               - email
               - password
+              - consentement
       security: []
       responses:
         '201':
@@ -115,6 +136,96 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Moi'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+    patch:
+      tags:
+      - Authentification
+      summary: Modifie mon profil et mes préférences
+      description: 'Rôles autorisés : tout utilisateur connecté. Seuls les champs listés sont pris en compte (jamais l''e-mail, le
+        mot de passe, le rôle ni le service). Le canal `sms` exige un numéro de téléphone.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                prenom:
+                  type: string
+                telephone:
+                  type: string
+                  nullable: true
+                langue:
+                  type: string
+                  enum:
+                  - fr
+                  - mg
+                canalNotification:
+                  type: string
+                  enum:
+                  - email
+                  - sms
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Moi'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+    delete:
+      tags:
+      - Authentification
+      summary: Supprime mon compte et mes données
+      description: 'Rôles autorisés : citoyen (les comptes du personnel sont gérés par un administrateur). Supprime les demandes
+        et leur historique, les rendez-vous, les avis et les notifications ; les exemples d''entraînement du moteur (anonymisés)
+        et les lignes du journal d''audit sont conservés sans lien avec le compte. Le jeton déjà émis cesse de fonctionner.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motDePasse:
+                  type: string
+              required:
+              - motDePasse
+      security:
+      - bearerAuth: []
+      responses:
+        '204':
+          description: Compte supprimé (sans corps)
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/me/donnees:
+    get:
+      tags:
+      - Authentification
+      summary: Exporte toutes mes données personnelles (droit d'accès)
+      description: 'Rôles autorisés : tout utilisateur connecté. JSON téléchargeable : profil, demandes avec historique, rendez-vous,
+        avis, notifications et journal de mes actions (500 dernières lignes). Jamais le mot de passe.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Données du compte
+          content:
+            application/json:
+              schema:
+                type: object
         '401':
           $ref: '#/components/responses/NonAuthentifie'
   /api/mot-de-passe/oublie:
@@ -204,6 +315,7 @@ paths:
       tags:
       - Services
       summary: Liste des services
+      description: Le public ne voit que les services actifs ; l'admin (jeton facultatif) voit aussi les services inactifs.
       security: []
       responses:
         '200':
@@ -262,6 +374,7 @@ paths:
       tags:
       - Services
       summary: Détail d'un service
+      description: Un service inactif répond 404, sauf pour l'admin.
       parameters:
       - $ref: '#/components/parameters/Id'
       security: []
@@ -322,15 +435,16 @@ paths:
     delete:
       tags:
       - Services
-      summary: Supprime un service
-      description: 'Rôles autorisés : admin.'
+      summary: Désactive un service (suppression logique)
+      description: 'Rôles autorisés : admin. Le service passe à `actif: false` (les demandes, rendez-vous et statistiques liés
+        restent intacts) ; `PUT {"actif": true}` le réactive. Répéter l''appel renvoie encore 204.'
       parameters:
       - $ref: '#/components/parameters/Id'
       security:
       - bearerAuth: []
       responses:
         '204':
-          description: Supprimé
+          description: Désactivé (sans corps)
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '403':
@@ -2042,6 +2156,23 @@ components:
             type: string
         service:
           type: integer
+          nullable: true
+        telephone:
+          type: string
+          nullable: true
+        langue:
+          type: string
+          enum:
+          - fr
+          - mg
+        canalNotification:
+          type: string
+          enum:
+          - email
+          - sms
+        consentementLe:
+          type: string
+          format: date-time
           nullable: true
     UtilisateurAdmin:
       type: object

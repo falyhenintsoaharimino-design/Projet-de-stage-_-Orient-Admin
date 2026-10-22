@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 21/10/2026)
+### Avancement (mis à jour le 22/10/2026)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -93,6 +93,25 @@ Fait, testé et poussé :
   - Règle d'accès constatée : agent et responsable ne s'héritent pas (le responsable ne peut pas réorienter, l'agent n'a pas les statistiques) ;
     l'admin a tout ; `retour` demande ROLE_CITOYEN (donc refusé à l'agent et au responsable).
 
+- Étape 6 Sécurité et comptes (migration `Version20261021120000`, dépendance `symfony/rate-limiter` à installer avec
+  `composer require symfony/rate-limiter`) : à confirmer chez l'étudiant (PHPUnit, `scripts/smoke-comptes.sh`, schema:validate).
+  - `login_throttling` sur le pare-feu `login` (ENF-04) : 5 échecs par minute et par couple e-mail + IP (25 pour toute l'IP, compteur
+    global jamais remis à zéro par une réussite) ; au-delà : 429 + `Retry-After` via `App\Security\LoginFailureHandler`. À passer à
+    `'15 minutes'` au déploiement (étape 19). En test, le compteur reste dans le cache fichier (un cache en mémoire est vidé entre deux requêtes) : `ComptesTest` utilise un e-mail aléatoire.
+  - Utilisateur : `telephone`, `langue` (`fr`|`mg`), `canalNotification` (`email`|`sms`, le SMS réel/simulé vient à l'étape 9),
+    `consentementLe`. `POST /api/register` exige `consentement: true` (date enregistrée), valide l'e-mail, accepte `telephone`.
+    Front minimal adapté (case à cocher + `api.register(..., consentement)`) pour ne pas casser l'inscription déjà branchée.
+  - `App\Service\CompteService` : `PATCH /api/me` (nom, prenom, telephone, langue, canalNotification ; le reste est ignoré ; sms exige un
+    téléphone), `GET /api/me/donnees` (export JSON : profil, demandes + historique, rendez-vous, avis, notifications, 500 dernières lignes de
+    journal ; jamais le mot de passe), `DELETE /api/me` `{"motDePasse"}` (citoyens seulement, 204 sans corps) : supprime demandes, historique,
+    rendez-vous, avis, notifications ; garde les `ExempleOrientation` (anonymisés, détachés de la demande) et le journal (détaché du compte).
+    Journal : `profil_modifie`, `donnees_exportees`, `compte_supprime`, `service_desactive`.
+  - `GET /api/services` et `/{id}` : services inactifs cachés au public (404), visibles pour l'admin ; `DELETE /api/services/{id}` =
+    désactivation (`actif=false`), 204 sans corps, répétable ; `PUT {"actif": true}` réactive. Non fait : les procédures d'un service inactif
+    restent listées (étape 7) ; changement d'e-mail et de mot de passe depuis le profil ; admin non supprimable par `DELETE /api/me`.
+  - Tests : `ComptesTest`, `ServicesVisibiliteTest`, `OutilsDeTestTrait` (comptes `ctest-...@orient-admin.test` supprimés en fin de test),
+    lignes ajoutées à `AccesParRoleTest` ; OpenAPI à 61 opérations.
+
 Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est PAS lu en environnement test) avec `DATABASE_URL`
 (même valeur que `.env.local`, le nom de base reçoit tout seul le suffixe `_test`) et `JWT_PASSPHRASE`. Puis, une fois :
 `php bin/console doctrine:database:create --env=test --if-not-exists`, `php bin/console doctrine:migrations:migrate --env=test --no-interaction` ;
@@ -105,11 +124,7 @@ discussion, pour économiser les tokens. Le backend est terminé et gelé AVANT 
 la refonte AVANT la connexion. Rien n'est branché à l'API tant que l'étape 16 n'est pas faite.
 
 PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de recette, OpenAPI à jour, `doctrine:schema:validate`)
-6. Sécurité et comptes : limitation des tentatives de connexion (ENF-04, `login_throttling`) ; `PATCH /api/me` (profil) avec
-   téléphone, langue et canal de notification préféré (EF-01, EF-05) ; suppression du compte sur demande, consentement à l'inscription (case à cocher, date enregistrée) et export des données
-   personnelles du compte, `GET /api/me/donnees` (droit d'accès, ENF-05) ;
-   `GET /api/services` sans les services inactifs pour le public (l'admin voit tout) ; `DELETE /api/services/{id}` en suppression
-   logique (au lieu de la suppression définitive qui peut échouer) avec une réponse 204 sans corps.
+6. FAIT (voir Avancement) : sécurité et comptes.
 7. Catalogue et procédures : champs `source` et date de mise à jour/vérification sur chaque procédure (EF-09, ENF-13) ;
    procédures, étapes et pièces modifiables par l'agent pour SON service, l'admin pour tous (EF-11, scénario S6) ; historique des
    versions et suppression logique ; fiche du service modifiable par son agent ; recherche tolérante aux fautes et filtres par

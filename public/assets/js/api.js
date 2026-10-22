@@ -72,8 +72,8 @@
       });
   }
 
-  function register(nom, prenom, email, password) {
-    return request("/register", { method: "POST", body: { nom: nom, prenom: prenom, email: email, password: password } });
+  function register(nom, prenom, email, password, consentement) {
+    return request("/register", { method: "POST", body: { nom: nom, prenom: prenom, email: email, password: password, consentement: consentement === true } });
   }
 
   function logout() { clearSession(); }

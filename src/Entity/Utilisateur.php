@@ -39,6 +39,21 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(options: ['default' => true])]
     private bool $actif = true;
 
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $telephone = null;
+
+    /** Langue préférée de l'interface : fr ou mg (malagasy, à venir côté front). */
+    #[ORM\Column(length: 5, options: ['default' => 'fr'])]
+    private string $langue = 'fr';
+
+    /** Canal préféré pour les notifications : email ou sms. */
+    #[ORM\Column(length: 20, options: ['default' => 'email'])]
+    private string $canalNotification = 'email';
+
+    /** Date du consentement au traitement des données (null : compte créé avant l'étape 6). */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $consentementLe = null;
+
     /**
      * @var Collection<int, Demande>
      */
@@ -130,6 +145,54 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     public function setActif(bool $actif): static
     {
         $this->actif = $actif;
+
+        return $this;
+    }
+
+    public function getTelephone(): ?string
+    {
+        return $this->telephone;
+    }
+
+    public function setTelephone(?string $telephone): static
+    {
+        $this->telephone = $telephone;
+
+        return $this;
+    }
+
+    public function getLangue(): string
+    {
+        return $this->langue;
+    }
+
+    public function setLangue(string $langue): static
+    {
+        $this->langue = $langue;
+
+        return $this;
+    }
+
+    public function getCanalNotification(): string
+    {
+        return $this->canalNotification;
+    }
+
+    public function setCanalNotification(string $canalNotification): static
+    {
+        $this->canalNotification = $canalNotification;
+
+        return $this;
+    }
+
+    public function getConsentementLe(): ?\DateTimeImmutable
+    {
+        return $this->consentementLe;
+    }
+
+    public function setConsentementLe(?\DateTimeImmutable $consentementLe): static
+    {
+        $this->consentementLe = $consentementLe;
 
         return $this;
     }
