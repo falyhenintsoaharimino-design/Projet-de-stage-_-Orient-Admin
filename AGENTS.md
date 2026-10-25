@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 22/10/2026)
+### Avancement (mis à jour le 22/10/2026, étape 7)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -108,9 +108,34 @@ Fait, testé et poussé :
     Journal : `profil_modifie`, `donnees_exportees`, `compte_supprime`, `service_desactive`.
   - `GET /api/services` et `/{id}` : services inactifs cachés au public (404), visibles pour l'admin ; `DELETE /api/services/{id}` =
     désactivation (`actif=false`), 204 sans corps, répétable ; `PUT {"actif": true}` réactive. Non fait : les procédures d'un service inactif
-    restent listées (étape 7) ; changement d'e-mail et de mot de passe depuis le profil ; admin non supprimable par `DELETE /api/me`.
+    restent listées (traité à l'étape 7) ; changement d'e-mail et de mot de passe depuis le profil ; admin non supprimable par `DELETE /api/me`.
   - Tests : `ComptesTest`, `ServicesVisibiliteTest`, `OutilsDeTestTrait` (comptes `ctest-...@orient-admin.test` supprimés en fin de test),
     lignes ajoutées à `AccesParRoleTest` ; OpenAPI à 61 opérations.
+
+- Étape 7 Catalogue et procédures (migration `Version20261022120000`, aucune dépendance Composer) : à confirmer chez l'étudiant
+  (PHPUnit, `scripts/smoke-catalogue.sh`, schema:validate). Vérifiée avant livraison : migration jouée sur des données existantes,
+  PHPUnit 202 tests OK, `smoke-catalogue.sh` 70 OK.
+  - Procédure : `source`, `misAJourLe` (renouvelée à chaque modification du contenu), `verifieLe`, `actif`, `numeroVersion` ; nom jusqu'à
+    150 caractères. Pièces : `exemplaires` (1 à 20), `ancienneteMaxMois`, `ouObtenir`. Réponses avec `avertissement` (information indicative, ENF-13).
+    Correction : `GET` d'une procédure qui avait des étapes plantait (méthode `getDescripton` mal nommée sur `EtapeProcedure`, renommée).
+  - `App\Service\CatalogueService` (validation, droits, versions, journal) : `POST/PUT /api/procedures` pour l'agent (SON service) et l'admin ;
+    `etapes` (liste de textes, l'ordre = la position) et `documentsRequis` (liste d'objets) remplacent toute la liste quand ils sont envoyés ;
+    `serviceId` modifiable par l'admin seulement ; `null` vide un champ facultatif. Erreurs de validation : 400.
+  - Historique `ProcedureVersion` : instantané complet à chaque changement réel (aucune version si le contenu est identique) ;
+    `GET /api/procedures/{id}/versions` (agent du service, admin). Une procédure antérieure à l'historique reçoit sa version « État initial »
+    à sa première modification. Résumés : Création, Modification : champs, Désactivation, Réactivation, État initial.
+  - Suppression logique : `DELETE /api/procedures/{id}` = `actif=false` (204 sans corps, réactivable par `PUT {"actif": true}`). Une procédure
+    inactive, ou d'un service inactif, est cachée au public (404 + absente des listes) ; `?inclureInactifs=true` la montre à l'admin et à
+    l'agent de son service. Les pièces et étapes retirées restent dans les instantanés de l'historique.
+  - `POST /api/procedures/{id}/verification` : « information vérifiée » (date `verifieLe`, pas de nouvelle version).
+  - Fiche service : `PUT /api/services/{id}` ouvert à l'agent de SON service (mission, adresse, horaires, contact, motsCles ; 403 s'il envoie
+    nom, categorie ou actif), à l'admin pour tout. Journal : `service_modifie`, `procedure_creee`, `procedure_modifiee`,
+    `procedure_desactivee`, `procedure_reactivee`, `procedure_verifiee`.
+  - Recherche (EF-07, EF-12) : `GET /api/services` et `/api/procedures` acceptent `q` (tolérante aux fautes : 1 à 2 lettres d'écart selon la
+    longueur du mot, accents et casse ignorés, deux lettres inversées = 1 faute ; tri par pertinence ; `App\Service\RechercheService`, en PHP,
+    sans extension PostgreSQL) et `rubrique` (= catégorie du service). `GET /api/services/rubriques` liste les rubriques avec leur nombre de services.
+  - Tests : `CatalogueTest`, `RechercheServiceTest`, lignes ajoutées à `AccesParRoleTest` ; OpenAPI à 64 opérations.
+    Non fait : restauration d'une ancienne version en un clic, procédures dans l'export de comptes (sans objet), export PDF de la liste de pièces (étape 16).
 
 Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est PAS lu en environnement test) avec `DATABASE_URL`
 (même valeur que `.env.local`, le nom de base reçoit tout seul le suffixe `_test`) et `JWT_PASSPHRASE`. Puis, une fois :
@@ -125,7 +150,7 @@ la refonte AVANT la connexion. Rien n'est branché à l'API tant que l'étape 16
 
 PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de recette, OpenAPI à jour, `doctrine:schema:validate`)
 6. FAIT (voir Avancement) : sécurité et comptes.
-7. Catalogue et procédures : champs `source` et date de mise à jour/vérification sur chaque procédure (EF-09, ENF-13) ;
+7. FAIT (voir Avancement) : catalogue et procédures. Cahier : champs `source` et date de mise à jour/vérification sur chaque procédure (EF-09, ENF-13) ;
    procédures, étapes et pièces modifiables par l'agent pour SON service, l'admin pour tous (EF-11, scénario S6) ; historique des
    versions et suppression logique ; fiche du service modifiable par son agent ; recherche tolérante aux fautes et filtres par
    rubrique sur services et procédures (EF-07, EF-12) ; pièces enrichies (nombre d'exemplaires, ancienneté maximale, où l'obtenir).

@@ -316,6 +316,19 @@ paths:
       - Services
       summary: Liste des services
       description: Le public ne voit que les services actifs ; l'admin (jeton facultatif) voit aussi les services inactifs.
+        Avec `q`, la recherche tolère les fautes de frappe (« naisance » trouve « naissance »), ignore les accents et la casse,
+        et trie du plus au moins pertinent ; `rubrique` filtre sur la catégorie du service.
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: Recherche par mots-clés (nom, mots-clés, catégorie, mission)
+      - name: rubrique
+        in: query
+        schema:
+          type: string
+        description: Catégorie du service (insensible à la casse et aux accents)
       security: []
       responses:
         '200':
@@ -369,6 +382,27 @@ paths:
           $ref: '#/components/responses/NonAuthentifie'
         '403':
           $ref: '#/components/responses/Interdit'
+  /api/services/rubriques:
+    get:
+      tags:
+      - Services
+      summary: Rubriques du catalogue
+      description: Catégories des services actifs, avec le nombre de services de chacune (tri alphabétique).
+      security: []
+      responses:
+        '200':
+          description: Rubriques
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    nom:
+                      type: string
+                    nombreServices:
+                      type: integer
   /api/services/{id}:
     get:
       tags:
@@ -391,7 +425,8 @@ paths:
       tags:
       - Services
       summary: Modifie un service (champs envoyés uniquement)
-      description: 'Rôles autorisés : admin.'
+      description: 'Rôles autorisés : admin (tous les champs) et agent, pour SON service seulement : mission, adresse, horaires,
+        contact et motsCles. L''agent qui envoie nom, categorie ou actif reçoit 403. Envoyer `null` vide un champ facultatif.'
       parameters:
       - $ref: '#/components/parameters/Id'
       requestBody:
@@ -426,6 +461,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '403':
@@ -456,12 +493,30 @@ paths:
       tags:
       - Procédures
       summary: Liste des procédures
+      description: Le public ne voit que les procédures actives d'un service actif. Avec `inclureInactifs=true` et un jeton,
+        l'admin voit aussi les procédures désactivées et l'agent celles de son service. `q` lance une recherche tolérante aux fautes
+        de frappe (nom, service, rubrique, mots-clés, description, pièces) et `rubrique` filtre sur la catégorie du service.
       parameters:
       - name: serviceId
         in: query
         schema:
           type: integer
         description: Filtre par service
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: Recherche par mots-clés
+      - name: rubrique
+        in: query
+        schema:
+          type: string
+        description: Catégorie du service
+      - name: inclureInactifs
+        in: query
+        schema:
+          type: boolean
+        description: Ajoute les procédures désactivées (agent de leur service, admin)
       security: []
       responses:
         '200':
@@ -476,29 +531,14 @@ paths:
       tags:
       - Procédures
       summary: Crée une procédure
-      description: 'Rôles autorisés : admin.'
+      description: 'Rôles autorisés : agent (pour son service) et admin. Crée la version 1 de l''historique. `etapes` et
+        `documentsRequis` sont facultatifs.'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                serviceId:
-                  type: integer
-                nom:
-                  type: string
-                description:
-                  type: string
-                delaiEstime:
-                  type: string
-                frais:
-                  type: string
-                version:
-                  type: string
-              required:
-              - serviceId
-              - nom
+              $ref: '#/components/schemas/ProcedureEcriture'
       security:
       - bearerAuth: []
       responses:
@@ -537,7 +577,10 @@ paths:
       tags:
       - Procédures
       summary: Modifie une procédure
-      description: 'Rôles autorisés : admin.'
+      description: 'Rôles autorisés : agent (pour son service) et admin ; seul l''admin peut changer `serviceId`. Seules les clés
+        envoyées sont modifiées ; `etapes` et `documentsRequis`, si présentes, remplacent toute la liste. Si le contenu change,
+        une nouvelle version est enregistrée et `misAJourLe` est renouvelée ; sinon rien ne change. `{"actif": true}` réactive
+        une procédure désactivée.'
       parameters:
       - $ref: '#/components/parameters/Id'
       requestBody:
@@ -545,20 +588,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                serviceId:
-                  type: integer
-                nom:
-                  type: string
-                description:
-                  type: string
-                delaiEstime:
-                  type: string
-                frais:
-                  type: string
-                version:
-                  type: string
+              $ref: '#/components/schemas/ProcedureEcriture'
       security:
       - bearerAuth: []
       responses:
@@ -568,6 +598,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Procedure'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '403':
@@ -577,15 +609,66 @@ paths:
     delete:
       tags:
       - Procédures
-      summary: Supprime une procédure
-      description: 'Rôles autorisés : admin.'
+      summary: Désactive une procédure (suppression logique)
+      description: 'Rôles autorisés : agent (pour son service) et admin. La procédure passe à `actif: false` (invisible du public,
+        historique conservé, version enregistrée) ; `PUT {"actif": true}` la réactive. Répéter l''appel renvoie encore 204.'
       parameters:
       - $ref: '#/components/parameters/Id'
       security:
       - bearerAuth: []
       responses:
         '204':
-          description: Supprimée
+          description: Désactivée (sans corps)
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/procedures/{id}/versions:
+    get:
+      tags:
+      - Procédures
+      summary: Historique des versions d'une procédure
+      description: 'Rôles autorisés : agent (pour son service) et admin. De la plus récente à la plus ancienne ; chaque version
+        contient l''instantané complet du contenu. Une procédure antérieure à l''historique reçoit sa version « État initial »
+        à sa première modification.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProcedureVersion'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/procedures/{id}/verification:
+    post:
+      tags:
+      - Procédures
+      summary: Confirme que l'information est toujours exacte
+      description: 'Rôles autorisés : agent (pour son service) et admin. Renseigne `verifieLe` ; aucune nouvelle version.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Procédure avec sa date de vérification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Procedure'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '403':
@@ -2248,14 +2331,37 @@ components:
           type: string
           nullable: true
         delaiEstime:
-          type: string
+          type: integer
           nullable: true
+          description: Délai estimé, en jours
         frais:
           type: string
           nullable: true
         version:
           type: string
           nullable: true
+          description: Libellé libre de version
+        numeroVersion:
+          type: integer
+          description: Numéro de la dernière version de l'historique
+        source:
+          type: string
+          nullable: true
+          description: Origine de l'information (texte de loi, site officiel, service...)
+        misAJourLe:
+          type: string
+          format: date-time
+          description: Date de la dernière modification du contenu
+        verifieLe:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date à laquelle un agent a confirmé que l'information est exacte
+        actif:
+          type: boolean
+        avertissement:
+          type: string
+          description: Mention que l'information est indicative (ENF-13)
         service:
           type: object
           properties:
@@ -2263,6 +2369,9 @@ components:
               type: integer
             nom:
               type: string
+            categorie:
+              type: string
+              nullable: true
         etapes:
           type: array
           items:
@@ -2288,6 +2397,101 @@ components:
               remarque:
                 type: string
                 nullable: true
+              exemplaires:
+                type: integer
+              ancienneteMaxMois:
+                type: integer
+                nullable: true
+                description: Ancienneté maximale de la pièce, en mois
+              ouObtenir:
+                type: string
+                nullable: true
+    ProcedureEcriture:
+      type: object
+      description: Création et modification. Textes limités (nom 150, frais et version 50, source et ouObtenir 255).
+      properties:
+        serviceId:
+          type: integer
+          description: Obligatoire à la création ; à la modification, réservé à l'admin
+        nom:
+          type: string
+        description:
+          type: string
+          nullable: true
+        delaiEstime:
+          type: integer
+          nullable: true
+          description: En jours (0 à 3650)
+        frais:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        actif:
+          type: boolean
+        etapes:
+          type: array
+          description: Étapes dans l'ordre (texte, ou objet avec `description`) ; remplace toute la liste
+          items:
+            type: string
+        documentsRequis:
+          type: array
+          description: Pièces à fournir ; remplace toute la liste
+          items:
+            type: object
+            properties:
+              libelle:
+                type: string
+              obligatoire:
+                type: boolean
+                default: true
+              remarque:
+                type: string
+                nullable: true
+              exemplaires:
+                type: integer
+                minimum: 1
+                maximum: 20
+                default: 1
+              ancienneteMaxMois:
+                type: integer
+                nullable: true
+                minimum: 1
+                maximum: 600
+              ouObtenir:
+                type: string
+                nullable: true
+            required:
+            - libelle
+      required:
+      - nom
+    ProcedureVersion:
+      type: object
+      properties:
+        numero:
+          type: integer
+        date:
+          type: string
+          format: date-time
+        auteur:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+        resume:
+          type: string
+          description: '« Création », « Modification : frais, étapes », « Désactivation », « Réactivation » ou « État initial »'
+        contenu:
+          type: object
+          description: Instantané complet (nom, description, delaiEstime, frais, version, source, serviceId, actif, etapes, documentsRequis)
+          additionalProperties: true
     Orientation:
       type: object
       properties:

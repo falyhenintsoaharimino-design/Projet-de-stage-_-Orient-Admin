@@ -41,12 +41,12 @@ class EtapeProcedure
         return $this;
     }
 
-    public function getDescripton(): ?string
+    public function getDescription(): ?string
     {
         return $this->description;
     }
 
-    public function setDescripton(string $description): static
+    public function setDescription(string $description): static
     {
         $this->description = $description;
 

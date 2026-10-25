@@ -16,7 +16,7 @@ class Procedure
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 50)]
+    #[ORM\Column(length: 150)]
     private ?string $nom = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -30,6 +30,26 @@ class Procedure
 
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $version = null;
+
+    /** Origine de l'information (texte de loi, site officiel, service concerné...) : EF-09, ENF-13. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $source = null;
+
+    /** Date de la dernière modification du contenu (fiche, étapes ou pièces). */
+    #[ORM\Column]
+    private ?\DateTimeImmutable $misAJourLe = null;
+
+    /** Date à laquelle un agent a confirmé que l'information est toujours exacte. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $verifieLe = null;
+
+    /** Suppression logique : une procédure inactive n'est plus visible du public. */
+    #[ORM\Column]
+    private bool $actif = true;
+
+    /** Numéro de la dernière version enregistrée dans l'historique (voir ProcedureVersion). */
+    #[ORM\Column]
+    private int $numeroVersion = 1;
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
@@ -46,12 +66,14 @@ class Procedure
      * @var Collection<int, DocumentRequis>
      */
     #[ORM\OneToMany(targetEntity: DocumentRequis::class, mappedBy: 'procedure', orphanRemoval: true)]
+    #[ORM\OrderBy(['id' => 'ASC'])]
     private Collection $documentRequis;
 
     public function __construct()
     {
         $this->etapeProcedures = new ArrayCollection();
         $this->documentRequis = new ArrayCollection();
+        $this->misAJourLe = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -115,6 +137,66 @@ class Procedure
     public function setVersion(?string $version): static
     {
         $this->version = $version;
+
+        return $this;
+    }
+
+    public function getSource(): ?string
+    {
+        return $this->source;
+    }
+
+    public function setSource(?string $source): static
+    {
+        $this->source = $source;
+
+        return $this;
+    }
+
+    public function getMisAJourLe(): ?\DateTimeImmutable
+    {
+        return $this->misAJourLe;
+    }
+
+    public function setMisAJourLe(\DateTimeImmutable $misAJourLe): static
+    {
+        $this->misAJourLe = $misAJourLe;
+
+        return $this;
+    }
+
+    public function getVerifieLe(): ?\DateTimeImmutable
+    {
+        return $this->verifieLe;
+    }
+
+    public function setVerifieLe(?\DateTimeImmutable $verifieLe): static
+    {
+        $this->verifieLe = $verifieLe;
+
+        return $this;
+    }
+
+    public function isActif(): bool
+    {
+        return $this->actif;
+    }
+
+    public function setActif(bool $actif): static
+    {
+        $this->actif = $actif;
+
+        return $this;
+    }
+
+    public function getNumeroVersion(): int
+    {
+        return $this->numeroVersion;
+    }
+
+    public function setNumeroVersion(int $numeroVersion): static
+    {
+        $this->numeroVersion = $numeroVersion;
 
         return $this;
     }

@@ -50,6 +50,7 @@ security:
         - { path: ^/api/mot-de-passe/, roles: PUBLIC_ACCESS }
         - { path: ^/api/orientation/tester$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/services$, methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api/services/rubriques$, methods: [GET], roles: PUBLIC_ACCESS }
         - { path: ^/api/services/\d+$, methods: [GET], roles: PUBLIC_ACCESS }
         - { path: ^/api/procedures$, methods: [GET], roles: PUBLIC_ACCESS }
         - { path: ^/api/procedures/\d+$, methods: [GET], roles: PUBLIC_ACCESS }

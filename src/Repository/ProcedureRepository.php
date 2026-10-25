@@ -16,28 +16,28 @@ class ProcedureRepository extends ServiceEntityRepository
         parent::__construct($registry, Procedure::class);
     }
 
-//    /**
-//     * @return Procedure[] Returns an array of Procedure objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('p')
-//            ->andWhere('p.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('p.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    /**
+     * Procédures listées pour un visiteur : actives, d'un service actif. Avec $inclureInactifs, un admin
+     * ($admin) voit tout et un agent ($monServiceId) voit en plus les procédures de son propre service.
+     *
+     * @return list<Procedure>
+     */
+    public function visibles(bool $inclureInactifs, bool $admin, ?int $monServiceId, ?int $serviceId): array
+    {
+        $qb = $this->createQueryBuilder('p')->join('p.service', 's')->addSelect('s')->orderBy('p.id', 'ASC');
 
-//    public function findOneBySomeField($value): ?Procedure
-//    {
-//        return $this->createQueryBuilder('p')
-//            ->andWhere('p.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+        if (!($inclureInactifs && $admin)) {
+            $visible = 'p.actif = true AND s.actif = true';
+            if ($inclureInactifs && $monServiceId !== null) {
+                $visible = "($visible) OR s.id = :monService";
+                $qb->setParameter('monService', $monServiceId);
+            }
+            $qb->andWhere($visible);
+        }
+        if ($serviceId !== null) {
+            $qb->andWhere('s.id = :serviceId')->setParameter('serviceId', $serviceId);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

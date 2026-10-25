@@ -76,6 +76,14 @@ class AccesParRoleTest extends WebTestCase
             ['PATCH', '/api/me', '{}', self::TOUS, 400],
             ['GET', '/api/me/donnees', '', self::TOUS, 200],
             ['DELETE', '/api/me', '{}', ['citoyen'], 400],
+            // Catalogue (étape 7) : l'agent (son service) et l'admin gèrent services et procédures ;
+            // identifiants inconnus ou corps invalides : rien n'est modifié.
+            ['PUT', "/api/services/$id", '{}', self::AGENT, 404],
+            ['POST', '/api/procedures', '{}', self::AGENT, 400],
+            ['PUT', "/api/procedures/$id", '{}', self::AGENT, 404],
+            ['DELETE', "/api/procedures/$id", '', self::AGENT, 404],
+            ['GET', "/api/procedures/$id/versions", '', self::AGENT, 404],
+            ['POST', "/api/procedures/$id/verification", '', self::AGENT, 404],
             // Suppression logique d'un service (identifiant inconnu : rien n'est désactivé)
             ['DELETE', "/api/services/$id", '', self::ADMIN, 404],
         ];

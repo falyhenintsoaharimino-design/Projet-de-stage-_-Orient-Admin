@@ -19,7 +19,8 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * creneau_cree, creneau_modifie, creneau_supprime, utilisateur_cree,
  * utilisateur_modifie, utilisateur_active, utilisateur_desactive,
  * mdp_oublie_demande, mdp_reinitialise, export_rapport, retour_orientation, exemple_supprime, moteur_reentraine,
- * profil_modifie, donnees_exportees, compte_supprime, service_desactive.
+ * profil_modifie, donnees_exportees, compte_supprime, service_desactive, service_modifie,
+ * procedure_creee, procedure_modifiee, procedure_desactivee, procedure_reactivee, procedure_verifiee.
  */
 class JournalService
 {

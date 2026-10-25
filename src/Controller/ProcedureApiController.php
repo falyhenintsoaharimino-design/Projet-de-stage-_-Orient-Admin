@@ -3,13 +3,19 @@
 namespace App\Controller;
 
 use App\Entity\Procedure;
+use App\Entity\Service;
+use App\Entity\Utilisateur;
 use App\Repository\ProcedureRepository;
 use App\Repository\ServiceRepository;
+use App\Service\CatalogueService;
+use App\Service\RechercheService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/procedures')]
@@ -19,139 +25,191 @@ class ProcedureApiController extends AbstractController
         private EntityManagerInterface $em,
         private ProcedureRepository $procedureRepository,
         private ServiceRepository $serviceRepository,
+        private CatalogueService $catalogue,
+        private RechercheService $recherche,
     ) {
     }
 
+    /**
+     * GET /api/procedures?serviceId=3&q=pasport&rubrique=État civil&inclureInactifs=1
+     * Public : procédures actives d'un service actif. `inclureInactifs` (jeton agent ou admin) ajoute les
+     * procédures désactivées (toutes pour l'admin, celles de son service pour l'agent).
+     */
     #[Route('', name: 'api_procedures_list', methods: ['GET'])]
-    public function list(Request $request): JsonResponse
+    public function list(Request $request, #[CurrentUser] ?Utilisateur $utilisateur): JsonResponse
     {
-        // Le frontend a besoin de lister les procédures d'un service donné
-        // (fiche service -> "Procédures liées") : /api/procedures?serviceId=3
         $serviceId = $request->query->get('serviceId');
+        $procedures = $this->procedureRepository->visibles(
+            filter_var($request->query->get('inclureInactifs'), FILTER_VALIDATE_BOOLEAN),
+            $this->isGranted('ROLE_ADMIN'),
+            $this->isGranted('ROLE_AGENT') ? $utilisateur?->getService()?->getId() : null,
+            $serviceId !== null && $serviceId !== '' ? (int) $serviceId : null,
+        );
 
-        $procedures = $serviceId
-            ? $this->procedureRepository->findBy(['service' => (int) $serviceId])
-            : $this->procedureRepository->findAll();
+        $rubrique = trim((string) $request->query->get('rubrique', ''));
+        if ($rubrique !== '') {
+            $voulue = $this->recherche->normaliser($rubrique);
+            $procedures = array_values(array_filter(
+                $procedures,
+                fn(Procedure $p) => $this->recherche->normaliser((string) $p->getService()->getCategorie()) === $voulue
+            ));
+        }
 
-        $data = array_map(fn(Procedure $p) => $this->toArray($p), $procedures);
+        $procedures = $this->recherche->filtrer(
+            $procedures,
+            (string) $request->query->get('q', ''),
+            fn(Procedure $p) => [
+                [$p->getNom(), 4],
+                [$p->getService()->getNom(), 2],
+                [$p->getService()->getCategorie(), 2],
+                [$p->getService()->getMotsCles(), 2],
+                [$p->getDescription(), 1],
+                [implode(' ', array_map(fn($d) => $d->getLibelle(), $p->getDocumentRequis()->toArray())), 1],
+            ]
+        );
 
-        return $this->json($data);
+        return $this->json(array_map(fn(Procedure $p) => $this->catalogue->serialiser($p), $procedures));
     }
 
-    #[Route('/{id}', name: 'api_procedures_show', methods: ['GET'])]
-    public function show(int $id): JsonResponse
+    #[Route('/{id}', name: 'api_procedures_show', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function show(int $id, #[CurrentUser] ?Utilisateur $utilisateur): JsonResponse
     {
         $procedure = $this->procedureRepository->find($id);
 
-        if (!$procedure) {
+        if (!$procedure || !$this->catalogue->estVisible($procedure, $utilisateur)) {
             return $this->json(['error' => 'Procédure non trouvée'], 404);
         }
 
-        return $this->json($this->toArray($procedure));
+        return $this->json($this->catalogue->serialiser($procedure));
     }
 
     #[Route('', name: 'api_procedures_create', methods: ['POST'])]
-    #[IsGranted('ROLE_ADMIN')]
-    public function create(Request $request): JsonResponse
+    #[IsGranted('ROLE_AGENT')]
+    public function create(Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
-        $data = json_decode($request->getContent(), true);
-
-        if (empty($data['serviceId'])) {
-            return $this->json(['error' => 'serviceId est requis'], 400);
-        }
-
-        $service = $this->serviceRepository->find($data['serviceId']);
-        if (!$service) {
-            return $this->json(['error' => 'Service introuvable'], 404);
-        }
-
-        $procedure = new Procedure();
-        $procedure->setNom($data['nom'] ?? '');
-        $procedure->setDescription($data['description'] ?? null);
-        $procedure->setDelaiEstime($data['delaiEstime'] ?? null);
-        $procedure->setFrais($data['frais'] ?? null);
-        $procedure->setVersion($data['version'] ?? null);
-        $procedure->setService($service);
-
-        $this->em->persist($procedure);
-        $this->em->flush();
-
-        return $this->json($this->toArray($procedure), 201);
-    }
-
-    #[Route('/{id}', name: 'api_procedures_update', methods: ['PUT'])]
-    #[IsGranted('ROLE_ADMIN')]
-    public function update(int $id, Request $request): JsonResponse
-    {
-        $procedure = $this->procedureRepository->find($id);
-
-        if (!$procedure) {
-            return $this->json(['error' => 'Procédure non trouvée'], 404);
-        }
-
-        $data = json_decode($request->getContent(), true);
-
-        if (isset($data['nom'])) $procedure->setNom($data['nom']);
-        if (isset($data['description'])) $procedure->setDescription($data['description']);
-        if (isset($data['delaiEstime'])) $procedure->setDelaiEstime($data['delaiEstime']);
-        if (isset($data['frais'])) $procedure->setFrais($data['frais']);
-        if (isset($data['version'])) $procedure->setVersion($data['version']);
-
-        if (isset($data['serviceId'])) {
+        try {
+            $data = $this->corps($request);
+            if (empty($data['serviceId']) || !is_scalar($data['serviceId'])) {
+                return $this->json(['error' => 'serviceId est requis'], 400);
+            }
             $service = $this->serviceRepository->find($data['serviceId']);
             if (!$service) {
                 return $this->json(['error' => 'Service introuvable'], 404);
             }
-            $procedure->setService($service);
+            $this->catalogue->exigerDroit($utilisateur, $service);
+            $procedure = $this->catalogue->enregistrer(null, $service, $data, $utilisateur);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
 
-        $this->em->flush();
-
-        return $this->json($this->toArray($procedure));
+        return $this->json($this->catalogue->serialiser($procedure), 201);
     }
 
-    #[Route('/{id}', name: 'api_procedures_delete', methods: ['DELETE'])]
-    #[IsGranted('ROLE_ADMIN')]
-    public function delete(int $id): JsonResponse
+    #[Route('/{id}', name: 'api_procedures_update', methods: ['PUT'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function update(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
         $procedure = $this->procedureRepository->find($id);
-
         if (!$procedure) {
             return $this->json(['error' => 'Procédure non trouvée'], 404);
         }
 
-        $this->em->remove($procedure);
-        $this->em->flush();
+        try {
+            $this->catalogue->exigerDroit($utilisateur, $procedure->getService());
+            $data = $this->corps($request);
+            $service = $this->serviceCible($procedure, $data, $utilisateur);
+            $this->catalogue->enregistrer($procedure, $service, $data, $utilisateur);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
 
-        return $this->json(['message' => 'Procédure supprimée'], 204);
+        return $this->json($this->catalogue->serialiser($procedure));
     }
 
-    private function toArray(Procedure $procedure): array
+    /** Suppression logique : la procédure est désactivée (réactivable avec PUT {"actif": true}). */
+    #[Route('/{id}', name: 'api_procedures_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function delete(int $id, #[CurrentUser] Utilisateur $utilisateur): Response
     {
-        return [
-            'id' => $procedure->getId(),
-            'nom' => $procedure->getNom(),
-            'description' => $procedure->getDescription(),
-            'delaiEstime' => $procedure->getDelaiEstime(),
-            'frais' => $procedure->getFrais(),
-            'version' => $procedure->getVersion(),
-            'service' => [
-                'id' => $procedure->getService()->getId(),
-                'nom' => $procedure->getService()->getNom(),
-            ],
-            // Sans ces deux listes, la fiche procédure du frontend (étapes +
-            // pièces à fournir) n'avait aucune donnée réelle à afficher.
-            'etapes' => array_map(fn($e) => [
-                'id' => $e->getId(),
-                'ordre' => $e->getOrdre(),
-                'description' => $e->getDescription(),
-            ], $procedure->getEtapeProcedures()->toArray()),
-            'documentsRequis' => array_map(fn($d) => [
-                'id' => $d->getId(),
-                'libelle' => $d->getLibelle(),
-                'obligatoire' => $d->isObligatoire(),
-                'remarque' => $d->getRemarque(),
-            ], $procedure->getDocumentRequis()->toArray()),
-        ];
+        $procedure = $this->procedureRepository->find($id);
+        if (!$procedure) {
+            return $this->json(['error' => 'Procédure non trouvée'], 404);
+        }
+
+        try {
+            $this->catalogue->exigerDroit($utilisateur, $procedure->getService());
+            $this->catalogue->desactiver($procedure, $utilisateur);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
+
+        return new Response(null, Response::HTTP_NO_CONTENT);
+    }
+
+    /** Historique des versions (instantanés complets), de la plus récente à la plus ancienne. */
+    #[Route('/{id}/versions', name: 'api_procedures_versions', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function versions(int $id, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $procedure = $this->procedureRepository->find($id);
+        if (!$procedure) {
+            return $this->json(['error' => 'Procédure non trouvée'], 404);
+        }
+
+        try {
+            $this->catalogue->exigerDroit($utilisateur, $procedure->getService());
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode());
+        }
+
+        return $this->json($this->catalogue->versions($procedure));
+    }
+
+    /** « Information vérifiée » : met à jour la date de vérification sans créer de nouvelle version. */
+    #[Route('/{id}/verification', name: 'api_procedures_verification', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function verification(int $id, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $procedure = $this->procedureRepository->find($id);
+        if (!$procedure) {
+            return $this->json(['error' => 'Procédure non trouvée'], 404);
+        }
+
+        try {
+            $this->catalogue->exigerDroit($utilisateur, $procedure->getService());
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode());
+        }
+        $this->catalogue->verifier($procedure, $utilisateur);
+
+        return $this->json($this->catalogue->serialiser($procedure));
+    }
+
+    /** @return array<string, mixed> */
+    private function corps(Request $request): array
+    {
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || array_is_list($data) && $data !== []) {
+            throw new \DomainException('Le corps de la requête doit être un objet JSON', 400);
+        }
+
+        return $data;
+    }
+
+    /** Déplacer une procédure vers un autre service est réservé à l'admin. */
+    private function serviceCible(Procedure $procedure, array $data, Utilisateur $utilisateur): Service
+    {
+        if (!isset($data['serviceId']) || !is_scalar($data['serviceId']) || (int) $data['serviceId'] === $procedure->getService()->getId()) {
+            return $procedure->getService();
+        }
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            throw new \DomainException('Seul l\'administrateur peut changer le service d\'une procédure', 403);
+        }
+        $service = $this->serviceRepository->find($data['serviceId']);
+        if (!$service) {
+            throw new \DomainException('Service introuvable', 404);
+        }
+
+        return $service;
     }
 }

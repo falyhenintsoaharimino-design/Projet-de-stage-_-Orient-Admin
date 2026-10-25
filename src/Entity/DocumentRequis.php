@@ -23,6 +23,18 @@ class DocumentRequis
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $remarque = null;
 
+    /** Nombre d'exemplaires à fournir. */
+    #[ORM\Column]
+    private int $exemplaires = 1;
+
+    /** Ancienneté maximale acceptée, en mois (ex. 3 = « de moins de 3 mois »). */
+    #[ORM\Column(nullable: true)]
+    private ?int $ancienneteMaxMois = null;
+
+    /** Où se procurer la pièce (mairie, fokontany, site officiel...). */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $ouObtenir = null;
+
     #[ORM\ManyToOne(inversedBy: 'documentRequis')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Procedure $procedure = null;
@@ -64,6 +76,42 @@ class DocumentRequis
     public function setRemarque(?string $remarque): static
     {
         $this->remarque = $remarque;
+
+        return $this;
+    }
+
+    public function getExemplaires(): int
+    {
+        return $this->exemplaires;
+    }
+
+    public function setExemplaires(int $exemplaires): static
+    {
+        $this->exemplaires = $exemplaires;
+
+        return $this;
+    }
+
+    public function getAncienneteMaxMois(): ?int
+    {
+        return $this->ancienneteMaxMois;
+    }
+
+    public function setAncienneteMaxMois(?int $ancienneteMaxMois): static
+    {
+        $this->ancienneteMaxMois = $ancienneteMaxMois;
+
+        return $this;
+    }
+
+    public function getOuObtenir(): ?string
+    {
+        return $this->ouObtenir;
+    }
+
+    public function setOuObtenir(?string $ouObtenir): static
+    {
+        $this->ouObtenir = $ouObtenir;
 
         return $this;
     }
