@@ -426,7 +426,7 @@ paths:
       - Services
       summary: Modifie un service (champs envoyés uniquement)
       description: 'Rôles autorisés : admin (tous les champs) et agent, pour SON service seulement : mission, adresse, horaires,
-        contact et motsCles. L''agent qui envoie nom, categorie ou actif reçoit 403. Envoyer `null` vide un champ facultatif.'
+        contact, motsCles, dureeCreneauMinutes, capaciteCreneau et joursFermes. L''agent qui envoie nom, categorie ou actif reçoit 403. Envoyer `null` vide un champ facultatif.'
       parameters:
       - $ref: '#/components/parameters/Id'
       requestBody:
@@ -871,8 +871,8 @@ paths:
     get:
       tags:
       - Créneaux
-      summary: Liste des créneaux (disponibles seulement pour les citoyens)
-      description: 'Rôles autorisés : tout utilisateur connecté.'
+      summary: Liste des créneaux (réservables seulement pour les citoyens)
+      description: 'Rôles autorisés : tout utilisateur connecté. Le citoyen ne voit que les créneaux ouverts qui ont encore une place ; le personnel voit tout, avec `reservations` et `placesRestantes`.'
       parameters:
       - name: serviceId
         in: query
@@ -917,6 +917,12 @@ paths:
                   type: array
                   items:
                     type: string
+                capacite:
+                  type: integer
+                  description: Par défaut celle du service
+                dureeMinutes:
+                  type: integer
+                  description: Par défaut celle du service
                 serviceId:
                   type: integer
                   description: Admin seulement
@@ -945,12 +951,105 @@ paths:
           $ref: '#/components/responses/Interdit'
         '400':
           $ref: '#/components/responses/RequeteInvalide'
+  /api/creneaux/generer:
+    post:
+      tags:
+      - Créneaux
+      summary: Génère des créneaux en lot
+      description: 'Rôles autorisés : agent (son service), admin (`serviceId`). Crée, pour chaque jour ouvert de la période, un créneau
+        toutes les `dureeMinutes` entre `heureDebut` et `heureFin` (sans chevaucher la pause). Durée, capacité et jours fermés
+        reprennent par défaut les réglages du service. Les créneaux déjà existants sont ignorés, ceux déjà passés ne sont pas créés.
+        Limites : 93 jours, 3000 créneaux.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                serviceId:
+                  type: integer
+                  description: Admin seulement
+                dateDebut:
+                  type: string
+                  format: date
+                dateFin:
+                  type: string
+                  format: date
+                  description: Par défaut dateDebut
+                heureDebut:
+                  type: string
+                  example: '08:00'
+                heureFin:
+                  type: string
+                  example: '15:00'
+                pauseDebut:
+                  type: string
+                  example: '12:00'
+                pauseFin:
+                  type: string
+                  example: '13:00'
+                dureeMinutes:
+                  type: integer
+                  minimum: 5
+                  maximum: 240
+                capacite:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                joursFermes:
+                  type: array
+                  description: 1 = lundi ... 7 = dimanche
+                  items:
+                    type: integer
+                datesFermees:
+                  type: array
+                  items:
+                    type: string
+                    format: date
+              required:
+              - dateDebut
+              - heureDebut
+              - heureFin
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Créneaux générés
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  crees:
+                    type: integer
+                  ignores:
+                    type: integer
+                  joursOuverts:
+                    type: integer
+                  creneauxParJour:
+                    type: integer
+                  dureeMinutes:
+                    type: integer
+                  capacite:
+                    type: integer
+                  joursFermes:
+                    type: array
+                    items:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
   /api/creneaux/{id}:
     patch:
       tags:
       - Créneaux
-      summary: Ouvre ou ferme un créneau
-      description: 'Rôles autorisés : agent, admin.'
+      summary: Ouvre ou bloque un créneau, ou change sa capacité
+      description: 'Rôles autorisés : agent, admin. Envoyer `disponible` et/ou `capacite` (au moins un). Bloquer (`disponible: false`) empêche
+        de nouvelles réservations sans toucher aux rendez-vous existants ; la capacité ne peut pas passer sous le nombre de rendez-vous actifs (409).'
       parameters:
       - $ref: '#/components/parameters/Id'
       requestBody:
@@ -962,8 +1061,10 @@ paths:
               properties:
                 disponible:
                   type: boolean
-              required:
-              - disponible
+                capacite:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
       security:
       - bearerAuth: []
       responses:
@@ -1008,7 +1109,7 @@ paths:
       tags:
       - Rendez-vous
       summary: Réserve un rendez-vous
-      description: 'Rôles autorisés : tout utilisateur connecté.'
+      description: 'Rôles autorisés : tout utilisateur connecté (le citoyen auteur de la demande). 409 si le créneau est passé, bloqué ou complet (capacité atteinte).'
       requestBody:
         required: true
         content:
@@ -1020,6 +1121,9 @@ paths:
                   type: integer
                 creneauId:
                   type: integer
+                procedureId:
+                  type: integer
+                  description: Facultatif ; procédure du même service, sert au récapitulatif « pièces à apporter »
               required:
               - demandeId
               - creneauId
@@ -1079,11 +1183,187 @@ paths:
           $ref: '#/components/responses/NonAuthentifie'
         '404':
           $ref: '#/components/responses/Introuvable'
+    patch:
+      tags:
+      - Rendez-vous
+      summary: Le citoyen change de créneau et/ou de procédure
+      description: 'Rôles autorisés : le citoyen auteur de la demande (jusqu''au délai limite avant le rendez-vous, 24 h par défaut : variable
+        `RDV_DELAI_ANNULATION_HEURES`) et l''admin. Un changement de créneau remet le rendez-vous « en attente » (l''agent doit le confirmer
+        de nouveau) et prévient les agents. `procedureId: null` retire la procédure. L''agent utilise `/reporter`.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                creneauId:
+                  type: integer
+                procedureId:
+                  type: integer
+                  nullable: true
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+        '422':
+          description: Créneau d'un autre service, déjà celui du rendez-vous, ou rien à modifier
+  /api/rendez-vous/{id}/reporter:
+    patch:
+      tags:
+      - Rendez-vous
+      summary: L'agent reporte un rendez-vous
+      description: 'Rôles autorisés : agent de ce service, admin. Déplace le rendez-vous (en attente ou confirmé) sur un autre créneau du même
+        service ; il est alors confirmé. Pas de délai limite. Le citoyen est prévenu (ancienne date, nouvelle date, motif).'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                creneauId:
+                  type: integer
+                motif:
+                  type: string
+                  maxLength: 500
+              required:
+              - creneauId
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Rendez-vous reporté
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RendezVous'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+        '422':
+          description: Créneau d'un autre service ou déjà celui du rendez-vous
+  /api/rendez-vous/{id}/recapitulatif:
+    get:
+      tags:
+      - Rendez-vous
+      summary: Récapitulatif de confirmation
+      description: 'Rôles autorisés : citoyen concerné, agent du service, responsable, admin. Date, heure de début et de fin, lieu, pièces à apporter
+        (celles de la procédure choisie, vide sinon) et date limite de modification par le citoyen.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Récapitulatif
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rendezVousId:
+                    type: integer
+                  statut:
+                    type: string
+                  quand:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      heureDebut:
+                        type: string
+                      heureFin:
+                        type: string
+                      dureeMinutes:
+                        type: integer
+                  lieu:
+                    type: object
+                    properties:
+                      service:
+                        type: string
+                      adresse:
+                        type: string
+                        nullable: true
+                      horaires:
+                        type: string
+                        nullable: true
+                      contact:
+                        type: string
+                        nullable: true
+                  procedure:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: integer
+                      nom:
+                        type: string
+                  piecesAApporter:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        libelle:
+                          type: string
+                        obligatoire:
+                          type: boolean
+                        exemplaires:
+                          type: integer
+                        ancienneteMaxMois:
+                          type: integer
+                          nullable: true
+                        ouObtenir:
+                          type: string
+                          nullable: true
+                        remarque:
+                          type: string
+                          nullable: true
+                  modifiableJusquau:
+                    type: string
+                    format: date-time
+                  modifiableParLeCitoyen:
+                    type: boolean
+                  avertissement:
+                    type: string
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
   /api/rendez-vous/{id}/annuler:
     patch:
       tags:
       - Rendez-vous
-      summary: Annule un rendez-vous
+      summary: Annule un rendez-vous (le citoyen jusqu'au délai limite)
       description: 'Rôles autorisés : tout utilisateur connecté.'
       parameters:
       - $ref: '#/components/parameters/Id'
@@ -2320,6 +2600,17 @@ components:
         motsCles:
           type: string
           nullable: true
+        dureeCreneauMinutes:
+          type: integer
+          description: Durée par défaut des créneaux (5 à 240)
+        capaciteCreneau:
+          type: integer
+          description: Capacité par défaut des créneaux (1 à 100)
+        joursFermes:
+          type: array
+          description: Jours sans rendez-vous, 1 = lundi ... 7 = dimanche
+          items:
+            type: integer
     Procedure:
       type: object
       properties:
@@ -2574,8 +2865,23 @@ components:
           format: date
         heure:
           type: string
+        heureFin:
+          type: string
+        dureeMinutes:
+          type: integer
         disponible:
           type: boolean
+          description: Ouvert par l'agent (false = bloqué)
+        capacite:
+          type: integer
+        reservations:
+          type: integer
+          description: Rendez-vous actifs (en attente ou confirmés)
+        placesRestantes:
+          type: integer
+        reservable:
+          type: boolean
+          description: Ouvert et au moins une place libre
         service:
           type: object
           properties:
@@ -2602,8 +2908,19 @@ components:
           format: date
         heure:
           type: string
+        heureFin:
+          type: string
         creneauId:
           type: integer
+        procedureId:
+          type: integer
+          nullable: true
+        modifiableJusquau:
+          type: string
+          format: date-time
+          description: Dernier moment où le citoyen peut modifier ou annuler
+        modifiableParLeCitoyen:
+          type: boolean
         demande:
           type: object
           properties:

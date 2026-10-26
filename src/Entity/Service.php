@@ -50,6 +50,17 @@ class Service
     /**
      * @var Collection<int, Creneau>
      */
+    /** Réglages des créneaux du service (EF-23), repris par défaut à la génération en lot. */
+    #[ORM\Column]
+    private int $dureeCreneauMinutes = 30;
+
+    #[ORM\Column]
+    private int $capaciteCreneau = 1;
+
+    /** Jours de la semaine sans rendez-vous : 1 = lundi ... 7 = dimanche. @var list<int> */
+    #[ORM\Column(type: Types::JSON)]
+    private array $joursFermes = [6, 7];
+
     #[ORM\OneToMany(targetEntity: Creneau::class, mappedBy: 'service', orphanRemoval: true)]
     private Collection $creneaux;
 
@@ -61,6 +72,44 @@ class Service
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getDureeCreneauMinutes(): int
+    {
+        return $this->dureeCreneauMinutes;
+    }
+
+    public function setDureeCreneauMinutes(int $dureeCreneauMinutes): static
+    {
+        $this->dureeCreneauMinutes = $dureeCreneauMinutes;
+
+        return $this;
+    }
+
+    public function getCapaciteCreneau(): int
+    {
+        return $this->capaciteCreneau;
+    }
+
+    public function setCapaciteCreneau(int $capaciteCreneau): static
+    {
+        $this->capaciteCreneau = $capaciteCreneau;
+
+        return $this;
+    }
+
+    /** @return list<int> */
+    public function getJoursFermes(): array
+    {
+        return $this->joursFermes;
+    }
+
+    /** @param list<int> $joursFermes */
+    public function setJoursFermes(array $joursFermes): static
+    {
+        $this->joursFermes = array_values($joursFermes);
+
+        return $this;
     }
 
     public function getNom(): ?string

@@ -144,6 +144,16 @@ class ServiceApiController extends AbstractController
         if (array_key_exists('actif', $data) && !is_bool($data['actif'])) {
             return $this->json(['error' => 'actif doit être true ou false'], 400);
         }
+        // Réglages des créneaux (EF-23) : l'agent règle son propre service.
+        foreach (['dureeCreneauMinutes' => [5, 240], 'capaciteCreneau' => [1, 100]] as $cle => [$min, $max]) {
+            if (array_key_exists($cle, $data) && (!is_int($data[$cle]) || $data[$cle] < $min || $data[$cle] > $max)) {
+                return $this->json(['error' => sprintf('%s doit être un entier de %d à %d', $cle, $min, $max)], 400);
+            }
+        }
+        if (array_key_exists('joursFermes', $data) && (!is_array($data['joursFermes']) || !array_is_list($data['joursFermes'])
+            || array_filter($data['joursFermes'], fn($j) => !is_int($j) || $j < 1 || $j > 7) !== [])) {
+            return $this->json(['error' => 'joursFermes doit être une liste d\'entiers de 1 (lundi) à 7 (dimanche)'], 400);
+        }
 
         // array_key_exists : envoyer null vide un champ facultatif (ex. horaires).
         if (array_key_exists('nom', $data)) $service->setNom($data['nom']);
@@ -154,9 +164,12 @@ class ServiceApiController extends AbstractController
         if (array_key_exists('contact', $data)) $service->setContact($data['contact']);
         if (array_key_exists('actif', $data)) $service->setActif($data['actif']);
         if (array_key_exists('motsCles', $data)) $service->setMotsCles($data['motsCles']);
+        if (array_key_exists('dureeCreneauMinutes', $data)) $service->setDureeCreneauMinutes($data['dureeCreneauMinutes']);
+        if (array_key_exists('capaciteCreneau', $data)) $service->setCapaciteCreneau($data['capaciteCreneau']);
+        if (array_key_exists('joursFermes', $data)) $service->setJoursFermes(array_values(array_unique($data['joursFermes'])));
 
         $this->em->flush();
-        $champs = array_values(array_intersect(['nom', 'mission', 'categorie', 'adresse', 'horaires', 'contact', 'motsCles', 'actif'], array_keys($data)));
+        $champs = array_values(array_intersect(['nom', 'mission', 'categorie', 'adresse', 'horaires', 'contact', 'motsCles', 'actif', 'dureeCreneauMinutes', 'capaciteCreneau', 'joursFermes'], array_keys($data)));
         $this->journal->enregistrer('service_modifie', $utilisateur, 'service=' . $id . ' champs=' . implode(',', $champs));
 
         return $this->json($this->toArray($service));
@@ -193,6 +206,9 @@ class ServiceApiController extends AbstractController
             'contact' => $service->getContact(),
             'actif' => $service->isActif(),
             'motsCles' => $service->getMotsCles(),
+            'dureeCreneauMinutes' => $service->getDureeCreneauMinutes(),
+            'capaciteCreneau' => $service->getCapaciteCreneau(),
+            'joursFermes' => $service->getJoursFermes(),
         ];
     }
 }

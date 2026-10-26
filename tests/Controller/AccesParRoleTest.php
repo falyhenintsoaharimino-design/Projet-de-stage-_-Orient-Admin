@@ -83,6 +83,11 @@ class AccesParRoleTest extends WebTestCase
             ['PUT', "/api/procedures/$id", '{}', self::AGENT, 404],
             ['DELETE', "/api/procedures/$id", '', self::AGENT, 404],
             ['GET', "/api/procedures/$id/versions", '', self::AGENT, 404],
+            // Rendez-vous (étape 8) : identifiant inconnu = 404 pour tout compte connecté ; report et génération en lot : agent / admin.
+            ['PATCH', "/api/rendez-vous/$id", '{}', self::TOUS, 404],
+            ['GET', "/api/rendez-vous/$id/recapitulatif", '', self::TOUS, 404],
+            ['PATCH', "/api/rendez-vous/$id/reporter", '{}', self::AGENT, 404],
+            ['POST', '/api/creneaux/generer', '{}', self::AGENT, 400],
             ['POST', "/api/procedures/$id/verification", '', self::AGENT, 404],
             // Suppression logique d'un service (identifiant inconnu : rien n'est désactivé)
             ['DELETE', "/api/services/$id", '', self::ADMIN, 404],

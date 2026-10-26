@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 22/10/2026, étape 7)
+### Avancement (mis à jour le 26/10/2026, étape 8)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -137,6 +137,36 @@ Fait, testé et poussé :
   - Tests : `CatalogueTest`, `RechercheServiceTest`, lignes ajoutées à `AccesParRoleTest` ; OpenAPI à 64 opérations.
     Non fait : restauration d'une ancienne version en un clic, procédures dans l'export de comptes (sans objet), export PDF de la liste de pièces (étape 16).
 
+- Étape 8 Rendez-vous (migration `Version20261026120000`, aucune dépendance Composer) : vérifiée avant livraison : migration jouée sur des
+  données existantes, PHPUnit 241 tests OK, `smoke-rendez-vous.sh` 85 OK, recettes `smoke`, `smoke-avis`, `smoke-journal`, `smoke-stats` toujours vertes.
+  - Créneau : `capacite` (rendez-vous simultanés) et `dureeMinutes` ; sortie avec `heureFin`, `reservations`, `placesRestantes`, `reservable`.
+    `disponible` signifie désormais « ouvert par l'agent » (false = bloqué, EF-29) : réserver ne le ferme plus, c'est le nombre de rendez-vous
+    actifs (en_attente, confirme) qui occupe les places. La migration rouvre les créneaux qui avaient été fermés par une réservation.
+    Le citoyen ne voit que les créneaux ouverts avec au moins une place. `PATCH /api/creneaux/{id}` : `disponible` et/ou `capacite` (jamais sous le
+    nombre de rendez-vous actifs) ; on peut rouvrir un créneau qui a déjà un rendez-vous.
+  - Service : `dureeCreneauMinutes` (5 à 240), `capaciteCreneau` (1 à 100) et `joursFermes` (1 = lundi ... 7 = dimanche, week-end par défaut), modifiables
+    par l'agent de SON service (`PUT /api/services/{id}`).
+  - `POST /api/creneaux/generer` (agent, admin avec `serviceId`) : période (93 jours au plus), plage horaire, pause, durée, capacité, jours fermés,
+    `datesFermees` ; réglages du service par défaut ; créneaux déjà existants ignorés, créneaux déjà passés non créés ; journal `creneaux_generes`.
+    Calculs purs dans `GenerateurCreneaux`. `POST /api/creneaux` accepte aussi `capacite` et `dureeMinutes`.
+  - Réservation (`RendezVousService`) : capacité vérifiée sous verrou, créneau passé refusé à l'heure près (409), « complet » (409).
+    Transaction manuelle : une erreur métier annule sans fermer l'EntityManager.
+  - Fuseau : `APP_TIMEZONE` (`Indian/Antananarivo` par défaut, dans `.env`) via `App\Service\Fuseau`. Les heures des créneaux sont lues dans ce fuseau
+    (`Creneau::getDebut($fuseau)`) pour décider qu'un créneau est passé ou que le délai limite est dépassé, même si le serveur PHP est en UTC.
+    Les dates déjà enregistrées en base et le fuseau global de PHP ne changent pas. À réutiliser pour les rappels (étape 9). Les recettes calculent
+    « demain » avec ce même fuseau (leçon : le shell Windows et PHP peuvent être à des dates différentes).
+  - Délai limite (EF-26) : variable `RDV_DELAI_ANNULATION_HEURES` (24 par défaut, dans `.env`). Le citoyen ne peut plus modifier ni annuler son
+    rendez-vous passé ce délai (409) ; l'agent et l'admin ne sont pas concernés. Sorties : `modifiableJusquau`, `modifiableParLeCitoyen`.
+  - `PATCH /api/rendez-vous/{id}` (citoyen auteur ou admin) : autre créneau du même service et/ou `procedureId` ; un autre créneau remet le rendez-vous
+    en attente (reconfirmation par l'agent) ; journal `rdv_modifie`. `PATCH /api/rendez-vous/{id}/reporter` (agent de ce service, admin) : `creneauId`,
+    `motif` facultatif ; rendez-vous confirmé sur le nouveau créneau, citoyen prévenu ; journal `rdv_reporte`.
+  - Récapitulatif (EF-28) : `GET /api/rendez-vous/{id}/recapitulatif` (date, heures de début et de fin, lieu avec adresse, horaires et contact, pièces à
+    apporter de la procédure choisie, date limite de modification). `procedureId` facultatif à la réservation. Les notifications (et e-mails) de réservation,
+    confirmation, modification et report indiquent le lieu et les pièces à apporter (EF-30).
+  - Tests : `RendezVousTest`, `GenerateurCreneauxTest`, `CreneauTest`, lignes ajoutées à `AccesParRoleTest` ; OpenAPI à 68 opérations.
+    Non fait (volontairement) : blocage d'une journée entière en une seule requête (se fait créneau par créneau), jours fériés globaux (étape 10, paramètres),
+    motif libre propre au rendez-vous (le texte de la demande en tient lieu).
+
 Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est PAS lu en environnement test) avec `DATABASE_URL`
 (même valeur que `.env.local`, le nom de base reçoit tout seul le suffixe `_test`) et `JWT_PASSPHRASE`. Puis, une fois :
 `php bin/console doctrine:database:create --env=test --if-not-exists`, `php bin/console doctrine:migrations:migrate --env=test --no-interaction` ;
@@ -144,8 +174,9 @@ et à chaque fois : `php bin/phpunit`.
 
 Reste à faire, dans cet ordre (décidé le 21/10/2026 après l'audit du backend et du front par rapport au cahier des charges) :
 
-Règle d'organisation : une discussion par étape (ou par rôle pour les revues), avec un résumé de passation précis en fin de
-discussion, pour économiser les tokens. Le backend est terminé et gelé AVANT la revue du front, la revue AVANT la refonte,
+Règle d'organisation (décidée le 25/10/2026) : 2 à 3 étapes par discussion selon la longueur des tâches, car relire le dépôt à
+chaque nouvelle discussion consomme beaucoup de tokens ; un patch, un script de recette et un commit par étape ; un résumé de
+passation seulement à la fin de la discussion (pas entre deux étapes d'une même discussion). Le backend est terminé et gelé AVANT la revue du front, la revue AVANT la refonte,
 la refonte AVANT la connexion. Rien n'est branché à l'API tant que l'étape 16 n'est pas faite.
 
 PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de recette, OpenAPI à jour, `doctrine:schema:validate`)
@@ -154,7 +185,7 @@ PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de
    procédures, étapes et pièces modifiables par l'agent pour SON service, l'admin pour tous (EF-11, scénario S6) ; historique des
    versions et suppression logique ; fiche du service modifiable par son agent ; recherche tolérante aux fautes et filtres par
    rubrique sur services et procédures (EF-07, EF-12) ; pièces enrichies (nombre d'exemplaires, ancienneté maximale, où l'obtenir).
-8. Rendez-vous : créneaux avec durée, capacité et jours fermés, génération en lot (EF-23) ; modification d'un rendez-vous par le
+8. FAIT (voir Avancement) : rendez-vous. Cahier : créneaux avec durée, capacité et jours fermés, génération en lot (EF-23) ; modification d'un rendez-vous par le
    citoyen et délai limite d'annulation (EF-26) ; report par l'agent (EF-27) ; récapitulatif de confirmation avec lieu et pièces
    à apporter (EF-28).
 9. Notifications : rappel automatique la veille (commande `app:rappels-rdv` à planifier, EF-31) ; alerte pièces manquantes ou

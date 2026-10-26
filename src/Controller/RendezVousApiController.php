@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Procedure;
 use App\Entity\RendezVous;
 use App\Entity\Utilisateur;
 use App\Repository\DemandeRepository;
@@ -18,10 +19,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Rendez-vous liés à une demande. Le citoyen réserve (statut en_attente) et
- * annule les siens ; l'agent voit ceux de son service, les confirme ou les
- * refuse, les annule et note l'issue (termine / absent) ; admin et
- * responsable consultent tout.
+ * Rendez-vous liés à une demande. Le citoyen réserve (statut en_attente), modifie et
+ * annule les siens jusqu'au délai limite avant le rendez-vous ; l'agent voit ceux de son
+ * service, les confirme ou les refuse, les reporte, les annule et note l'issue
+ * (termine / absent) ; admin et responsable consultent tout.
  */
 #[Route('/api/rendez-vous')]
 class RendezVousApiController extends AbstractController
@@ -36,7 +37,7 @@ class RendezVousApiController extends AbstractController
     ) {
     }
 
-    /** Corps : { "demandeId": 12, "creneauId": 34 } */
+    /** Corps : { "demandeId": 12, "creneauId": 34, "procedureId": 5 } (procedureId facultatif : sert au récapitulatif « pièces à apporter »). */
     #[Route('', name: 'api_rdv_create', methods: ['POST'])]
     public function create(Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
@@ -56,8 +57,16 @@ class RendezVousApiController extends AbstractController
             return $this->json(['error' => 'Accès refusé'], 403);
         }
 
+        $procedure = null;
+        if (!empty($data['procedureId'])) {
+            $procedure = $this->em->find(Procedure::class, (int) $data['procedureId']);
+            if (!$procedure) {
+                return $this->json(['error' => 'Procédure introuvable'], 404);
+            }
+        }
+
         try {
-            $rdv = $this->rendezVousService->reserver($demande, (int) $creneauId);
+            $rdv = $this->rendezVousService->reserver($demande, (int) $creneauId, $procedure);
             $this->em->flush();
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
@@ -106,6 +115,101 @@ class RendezVousApiController extends AbstractController
         return $this->json($this->toArray($rdv));
     }
 
+    /**
+     * Récapitulatif de confirmation (EF-28) : date, heure, lieu (adresse, horaires, contact), pièces à apporter,
+     * et date limite de modification par le citoyen.
+     */
+    #[Route('/{id}/recapitulatif', name: 'api_rdv_recapitulatif', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function recapitulatif(int $id, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $rdv = $this->rendezVousRepository->find($id);
+        if (!$rdv) {
+            return $this->json(['error' => 'Rendez-vous non trouvé'], 404);
+        }
+        if (!$this->peutAcceder($rdv, $utilisateur, true)) {
+            return $this->json(['error' => 'Accès refusé'], 403);
+        }
+
+        return $this->json($this->rendezVousService->recapitulatif($rdv));
+    }
+
+    /**
+     * Le citoyen change de créneau et/ou de procédure : { "creneauId": 40, "procedureId": 5 } (au moins un des deux ;
+     * procedureId null retire la procédure). Un changement de créneau remet le rendez-vous « en attente ».
+     * Impossible passé le délai limite (409) ; l'agent utilise plutôt /reporter.
+     */
+    #[Route('/{id}', name: 'api_rdv_modifier', methods: ['PATCH'], requirements: ['id' => '\d+'])]
+    public function modifier(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $rdv = $this->rendezVousRepository->find($id);
+        if (!$rdv) {
+            return $this->json(['error' => 'Rendez-vous non trouvé'], 404);
+        }
+        if (!$this->isGranted('ROLE_ADMIN') && $rdv->getDemande()?->getUtilisateur() !== $utilisateur) {
+            return $this->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Le corps de la requête doit être un objet JSON'], 400);
+        }
+        $creneauId = $data['creneauId'] ?? null;
+        if ($creneauId !== null && !is_int($creneauId)) {
+            return $this->json(['error' => 'creneauId doit être un entier'], 400);
+        }
+        $changerProcedure = array_key_exists('procedureId', $data);
+        $procedure = null;
+        if ($changerProcedure && $data['procedureId'] !== null) {
+            $procedure = is_int($data['procedureId']) ? $this->em->find(Procedure::class, $data['procedureId']) : null;
+            if (!$procedure) {
+                return $this->json(['error' => 'Procédure introuvable'], 404);
+            }
+        }
+
+        try {
+            $this->rendezVousService->modifier($rdv, $creneauId, $procedure, $changerProcedure, !$this->isGranted('ROLE_ADMIN'));
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
+
+        $this->journaliser('rdv_modifie', $utilisateur, $rdv);
+
+        return $this->json($this->toArray($rdv));
+    }
+
+    /** Report par l'agent (EF-27) : { "creneauId": 41, "motif": "Absence de l'agent" } ; le rendez-vous est confirmé sur le nouveau créneau. */
+    #[Route('/{id}/reporter', name: 'api_rdv_reporter', methods: ['PATCH'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function reporter(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $rdv = $this->rendezVousRepository->find($id);
+        if (!$rdv) {
+            return $this->json(['error' => 'Rendez-vous non trouvé'], 404);
+        }
+        if (!$this->peutAcceder($rdv, $utilisateur, false)) {
+            return $this->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || !is_int($data['creneauId'] ?? null)) {
+            return $this->json(['error' => 'creneauId (entier) est requis'], 400);
+        }
+        $motif = $data['motif'] ?? null;
+        if ($motif !== null && (!is_string($motif) || strlen($motif) > 500)) {
+            return $this->json(['error' => 'motif doit être un texte de 500 caractères au plus'], 400);
+        }
+
+        try {
+            $this->rendezVousService->reporter($rdv, $data['creneauId'], $motif !== null && trim($motif) !== '' ? trim($motif) : null);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
+        }
+
+        $this->journaliser('rdv_reporte', $utilisateur, $rdv);
+
+        return $this->json($this->toArray($rdv));
+    }
+
     #[Route('/{id}/annuler', name: 'api_rdv_annuler', methods: ['PATCH'], requirements: ['id' => '\d+'])]
     public function annuler(int $id, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
@@ -118,7 +222,8 @@ class RendezVousApiController extends AbstractController
         }
 
         try {
-            $this->rendezVousService->annuler($rdv, $utilisateur);
+            // Le citoyen est soumis au délai limite ; l'agent et l'admin non.
+            $this->rendezVousService->annuler($rdv, $utilisateur, !$this->isGranted('ROLE_AGENT'));
         } catch (\DomainException $e) {
             return $this->json(['error' => $e->getMessage()], $e->getCode() ?: 400);
         }
@@ -227,7 +332,11 @@ class RendezVousApiController extends AbstractController
             'statut' => $rdv->getStatut(),
             'date' => $creneau?->getDate()?->format('Y-m-d'),
             'heure' => $creneau?->getHeure(),
+            'heureFin' => $creneau?->getFin()?->format('H:i'),
             'creneauId' => $creneau?->getId(),
+            'procedureId' => $rdv->getProcedure()?->getId(),
+            'modifiableJusquau' => $this->rendezVousService->limiteModification($rdv)?->format(\DATE_ATOM),
+            'modifiableParLeCitoyen' => $this->rendezVousService->modifiableParLeCitoyen($rdv),
             'demande' => [
                 'id' => $demande?->getId(),
                 'texte' => $demande?->getTextDemande(),

@@ -16,28 +16,42 @@ class RendezVousRepository extends ServiceEntityRepository
         parent::__construct($registry, RendezVous::class);
     }
 
-//    /**
-//     * @return RendezVous[] Returns an array of RendezVous objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('r')
-//            ->andWhere('r.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('r.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    public const STATUTS_ACTIFS = ['en_attente', 'confirme'];
 
-//    public function findOneBySomeField($value): ?RendezVous
-//    {
-//        return $this->createQueryBuilder('r')
-//            ->andWhere('r.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+    /** Nombre de rendez-vous actifs (en attente ou confirmés) d'un créneau. */
+    public function compterActifs(int $creneauId): int
+    {
+        return (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('IDENTITY(r.creneau) = :c')->andWhere('r.statut IN (:statuts)')
+            ->setParameter('c', $creneauId)->setParameter('statuts', self::STATUTS_ACTIFS)
+            ->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Nombre de rendez-vous actifs pour chaque créneau d'une liste, en une seule requête.
+     *
+     * @param list<int> $creneauIds
+     *
+     * @return array<int, int> créneau => nombre
+     */
+    public function compterActifsParCreneau(array $creneauIds): array
+    {
+        if ($creneauIds === []) {
+            return [];
+        }
+        $lignes = $this->createQueryBuilder('r')
+            ->select('IDENTITY(r.creneau) AS creneau, COUNT(r.id) AS nb')
+            ->where('IDENTITY(r.creneau) IN (:ids)')->andWhere('r.statut IN (:statuts)')
+            ->setParameter('ids', $creneauIds)->setParameter('statuts', self::STATUTS_ACTIFS)
+            ->groupBy('r.creneau')
+            ->getQuery()->getArrayResult();
+
+        $nombres = [];
+        foreach ($lignes as $ligne) {
+            $nombres[(int) $ligne['creneau']] = (int) $ligne['nb'];
+        }
+
+        return $nombres;
+    }
 }

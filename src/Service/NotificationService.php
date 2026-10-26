@@ -52,10 +52,13 @@ class NotificationService
     }
 
     /**
-     * Événements d'un rendez-vous : reserve, confirme, refuse, annule, termine.
+     * Événements d'un rendez-vous : reserve, confirme, refuse, annule, termine, modifie, reporte.
      * $par = l'utilisateur qui a agi (sert à savoir qui prévenir en cas d'annulation).
+     * $contexte : pour « reporte », 'ancien' (ancienne date) et 'motif' facultatif.
+     *
+     * @param array<string, mixed> $contexte
      */
-    public function notifierRendezVous(RendezVous $rdv, string $evenement, ?Utilisateur $par = null): void
+    public function notifierRendezVous(RendezVous $rdv, string $evenement, ?Utilisateur $par = null, array $contexte = []): void
     {
         $citoyen = $rdv->getDemande()?->getUtilisateur();
         $creneau = $rdv->getCreneau();
@@ -66,13 +69,15 @@ class NotificationService
 
         $quand = sprintf('du %s à %s', $creneau->getDate()?->format('d/m/Y'), $creneau->getHeure());
         $lieu = $service?->getNom() ?? 'le service';
+        $adresse = $service?->getAdresse();
+        $ou = $adresse ? "$lieu, $adresse" : $lieu;
         $agents = $service ? $this->utilisateurRepository->findAgentsDuService($service) : [];
         $nomCitoyen = trim($citoyen->getPrenom() . ' ' . $citoyen->getNom());
 
         switch ($evenement) {
             case 'reserve':
                 $this->notifier($citoyen, 'rdv_en_attente', 'Demande de rendez-vous enregistrée',
-                    "Votre demande de rendez-vous $quand ($lieu) est enregistrée. Un agent doit la confirmer.");
+                    "Votre demande de rendez-vous $quand ($ou) est enregistrée. Un agent doit la confirmer." . $this->piecesAApporter($rdv));
                 foreach ($agents as $agent) {
                     $this->notifier($agent, 'rdv_a_valider', 'Nouveau rendez-vous à valider',
                         "$nomCitoyen demande un rendez-vous $quand. À confirmer ou refuser.");
@@ -81,7 +86,22 @@ class NotificationService
 
             case 'confirme':
                 $this->notifier($citoyen, 'rdv_confirme', 'Rendez-vous confirmé',
-                    "Votre rendez-vous $quand ($lieu) est confirmé.");
+                    "Votre rendez-vous $quand est confirmé. Lieu : $ou." . $this->piecesAApporter($rdv));
+                break;
+
+            case 'modifie':
+                $this->notifier($citoyen, 'rdv_modifie', 'Rendez-vous modifié',
+                    "Votre rendez-vous est maintenant fixé $quand ($ou). Un agent doit le confirmer de nouveau." . $this->piecesAApporter($rdv));
+                foreach ($agents as $agent) {
+                    $this->notifier($agent, 'rdv_a_valider', 'Rendez-vous modifié à valider',
+                        "$nomCitoyen a déplacé son rendez-vous $quand. À confirmer ou refuser.");
+                }
+                break;
+
+            case 'reporte':
+                $motif = !empty($contexte['motif']) ? ' Motif : ' . $contexte['motif'] . '.' : '';
+                $this->notifier($citoyen, 'rdv_reporte', 'Rendez-vous reporté',
+                    "Votre rendez-vous " . ($contexte['ancien'] ?? '') . " est reporté : il a lieu $quand ($ou).$motif" . $this->piecesAApporter($rdv));
                 break;
 
             case 'refuse':
@@ -108,6 +128,31 @@ class NotificationService
                 }
                 break;
         }
+    }
+
+    /** « Pièces à apporter : ... » d'après la procédure choisie pour le rendez-vous (vide sinon). */
+    private function piecesAApporter(RendezVous $rdv): string
+    {
+        $procedure = $rdv->getProcedure();
+        if (!$procedure || $procedure->getDocumentRequis()->isEmpty()) {
+            return '';
+        }
+        $lignes = [];
+        foreach ($procedure->getDocumentRequis() as $d) {
+            $details = [];
+            if ($d->getExemplaires() > 1) {
+                $details[] = $d->getExemplaires() . ' exemplaires';
+            }
+            if ($d->getAncienneteMaxMois() !== null) {
+                $details[] = 'de moins de ' . $d->getAncienneteMaxMois() . ' mois';
+            }
+            if (!$d->isObligatoire()) {
+                $details[] = 'facultatif';
+            }
+            $lignes[] = $d->getLibelle() . ($details ? ' (' . implode(', ', $details) . ')' : '');
+        }
+
+        return ' Pièces à apporter : ' . implode(' ; ', $lignes) . '.';
     }
 
     /** E-mail seul, sans ligne de notification en base (ne lève jamais d'exception). */

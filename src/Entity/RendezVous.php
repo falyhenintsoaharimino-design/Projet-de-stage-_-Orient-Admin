@@ -29,6 +29,23 @@ class RendezVous
         return $this->id;
     }
 
+    /** Procédure concernée par le rendez-vous : sert au récapitulatif « pièces à apporter » (EF-28). */
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Procedure $procedure = null;
+
+    public function getProcedure(): ?Procedure
+    {
+        return $this->procedure;
+    }
+
+    public function setProcedure(?Procedure $procedure): static
+    {
+        $this->procedure = $procedure;
+
+        return $this;
+    }
+
     public function getStatut(): ?string
     {
         return $this->statut;
