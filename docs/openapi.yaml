@@ -1359,6 +1359,60 @@ paths:
           $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
+  /api/rendez-vous/{id}/pieces-manquantes:
+    post:
+      tags:
+      - Rendez-vous
+      summary: Alerte « pièces manquantes »
+      description: 'Rôles autorisés : agent de ce service, admin. Le citoyen reçoit une notification (et un e-mail, ou un SMS simulé s''il a choisi ce canal)
+        avec la liste de ce qu''il doit encore apporter. Rendez-vous en attente ou confirmé seulement (409 sinon).'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pieces:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: string
+                    maxLength: 150
+                message:
+                  type: string
+                  maxLength: 500
+              required:
+              - pieces
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Citoyen prévenu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prevenu:
+                    type: boolean
+                  pieces:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
   /api/rendez-vous/{id}/annuler:
     patch:
       tags:
@@ -1559,6 +1613,123 @@ paths:
           $ref: '#/components/responses/NonAuthentifie'
         '404':
           $ref: '#/components/responses/Introuvable'
+  /api/demandes/{id}/messages:
+    get:
+      tags:
+      - Notifications
+      summary: Messages de l'agent liés à une demande
+      description: 'Rôles autorisés : citoyen auteur de la demande, agent du service, responsable, admin. Du plus ancien au plus récent.'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageAgent'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+    post:
+      tags:
+      - Notifications
+      summary: L'agent écrit au citoyen (page « communication »)
+      description: 'Rôles autorisés : agent du service de la demande, admin. Le citoyen reçoit le message comme notification (et un e-mail, ou un SMS simulé
+        s''il a choisi ce canal).'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  maxLength: 2000
+                sujet:
+                  type: string
+                  maxLength: 150
+              required:
+              - message
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Message envoyé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageAgent'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          $ref: '#/components/responses/Introuvable'
+  /api/sms-simules:
+    get:
+      tags:
+      - Notifications
+      summary: Boîte d'envoi des SMS simulés
+      description: 'Rôles autorisés : admin. Aucun SMS réel n''est envoyé : la passerelle est simulée (EF-33). Un SMS part quand le destinataire a choisi le
+        canal `sms` et renseigné son téléphone ; sinon il reçoit un e-mail. Les SMS n''apparaissent pas dans le centre de notifications.'
+      parameters:
+      - name: limite
+        in: query
+        schema:
+          type: integer
+          default: 50
+          maximum: 200
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: SMS simulés, du plus récent au plus ancien
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    telephone:
+                      type: string
+                      nullable: true
+                    destinataire:
+                      type: object
+                      nullable: true
+                      properties:
+                        id:
+                          type: integer
+                        nom:
+                          type: string
+                    message:
+                      type: string
+                      description: 320 caractères au plus
+                    statut:
+                      type: string
+                      example: envoye
+                    date:
+                      type: string
+                      format: date-time
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
   /api/notifications:
     get:
       tags:
@@ -2783,6 +2954,29 @@ components:
           type: object
           description: Instantané complet (nom, description, delaiEstime, frais, version, source, serviceId, actif, etapes, documentsRequis)
           additionalProperties: true
+    MessageAgent:
+      type: object
+      properties:
+        id:
+          type: integer
+        demandeId:
+          type: integer
+        sujet:
+          type: string
+          nullable: true
+        message:
+          type: string
+        auteur:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            nom:
+              type: string
+        date:
+          type: string
+          format: date-time
     Orientation:
       type: object
       properties:

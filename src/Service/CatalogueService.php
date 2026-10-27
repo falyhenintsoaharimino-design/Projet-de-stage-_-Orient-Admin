@@ -8,6 +8,7 @@ use App\Entity\Procedure;
 use App\Entity\ProcedureVersion;
 use App\Entity\Service;
 use App\Entity\Utilisateur;
+use App\Repository\RendezVousRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -28,6 +29,9 @@ class CatalogueService
     public function __construct(
         private EntityManagerInterface $em,
         private JournalService $journal,
+        private RendezVousRepository $rendezVousRepository,
+        private NotificationService $notifications,
+        private Fuseau $fuseau,
     ) {
     }
 
@@ -109,6 +113,9 @@ class CatalogueService
             default => 'procedure_modifiee',
         };
         $this->journal->enregistrer($action, $auteur, 'procedure=' . $procedure->getId() . ' version=' . $numero);
+        if (!$creation) {
+            $this->prevenirLesRendezVous($procedure, $avant, $apres);
+        }
 
         return $procedure;
     }
@@ -347,14 +354,55 @@ class CatalogueService
         if (!$avant['actif'] && $apres['actif']) {
             return 'Réactivation';
         }
+
+        return 'Modification : ' . implode(', ', $this->champsModifies($avant, $apres));
+    }
+
+    /**
+     * @param array<string, mixed> $avant
+     * @param array<string, mixed> $apres
+     *
+     * @return array<string, string> clé du champ => étiquette, pour les champs qui ont changé
+     */
+    private function champsModifies(array $avant, array $apres): array
+    {
         $champs = [];
         foreach (self::ETIQUETTES as $cle => $etiquette) {
             if (($avant[$cle] ?? null) !== ($apres[$cle] ?? null)) {
-                $champs[] = $etiquette;
+                $champs[$cle] = $etiquette;
             }
         }
 
-        return 'Modification : ' . implode(', ', $champs);
+        return $champs;
+    }
+
+    /**
+     * Alerte « changement de procédure » (EF-32) : les citoyens qui ont un rendez-vous à venir (en attente ou confirmé) pour
+     * cette procédure sont prévenus. Rien n'est envoyé pour une réactivation ni pour un simple changement de source ou de libellé.
+     *
+     * @param array<string, mixed> $avant
+     * @param array<string, mixed> $apres
+     */
+    private function prevenirLesRendezVous(Procedure $procedure, array $avant, array $apres): void
+    {
+        if (!$avant['actif'] && $apres['actif']) {
+            return;
+        }
+        $modifies = $this->champsModifies($avant, $apres);
+        if (array_diff(array_keys($modifies), ['source', 'version']) === []) {
+            return;
+        }
+        $libelles = $apres['actif']
+            ? implode(', ', array_values(array_diff_key($modifies, ['source' => 1, 'version' => 1, 'actif' => 1])))
+            : 'procédure désactivée';
+
+        $rendezVous = $this->rendezVousRepository->aVenirDeLaProcedure($procedure, $this->fuseau->aujourdhui()->format('Y-m-d'));
+        foreach ($rendezVous as $rdv) {
+            $this->notifications->procedureModifiee($rdv, $procedure, $libelles);
+        }
+        if ($rendezVous !== []) {
+            $this->em->flush();
+        }
     }
 
     private function aDesVersions(Procedure $procedure): bool

@@ -148,6 +148,7 @@ class RendezVousService
                 $this->verifierReservable($creneau);
                 $rdv->setCreneau($creneau);
                 $rdv->setStatut('en_attente');
+                $rdv->setRappelEnvoyeLe(null); // un nouveau rappel partira pour la nouvelle date
             }
             if ($changerProcedure) {
                 $rdv->setProcedure($procedure);
@@ -175,6 +176,7 @@ class RendezVousService
             $this->verifierReservable($creneau);
             $rdv->setCreneau($creneau);
             $rdv->setStatut('confirme');
+            $rdv->setRappelEnvoyeLe(null);
         });
 
         $this->notifications->notifierRendezVous($rdv, 'reporte', null, ['ancien' => $ancien, 'motif' => $motif]);

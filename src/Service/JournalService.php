@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * mdp_oublie_demande, mdp_reinitialise, export_rapport, retour_orientation, exemple_supprime, moteur_reentraine,
  * profil_modifie, donnees_exportees, compte_supprime, service_desactive, service_modifie,
  * procedure_creee, procedure_modifiee, procedure_desactivee, procedure_reactivee, procedure_verifiee,
- * creneaux_generes, rdv_modifie, rdv_reporte.
+ * creneaux_generes, rdv_modifie, rdv_reporte, rdv_pieces_manquantes, message_agent_envoye, rappels_envoyes.
  */
 class JournalService
 {

@@ -34,6 +34,22 @@ class RendezVous
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Procedure $procedure = null;
 
+    /** Date d'envoi du rappel de la veille (EF-31) ; vidée si le rendez-vous est déplacé, pour qu'un nouveau rappel parte. */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $rappelEnvoyeLe = null;
+
+    public function getRappelEnvoyeLe(): ?\DateTimeImmutable
+    {
+        return $this->rappelEnvoyeLe;
+    }
+
+    public function setRappelEnvoyeLe(?\DateTimeImmutable $rappelEnvoyeLe): static
+    {
+        $this->rappelEnvoyeLe = $rappelEnvoyeLe;
+
+        return $this;
+    }
+
     public function getProcedure(): ?Procedure
     {
         return $this->procedure;

@@ -2,7 +2,9 @@
 
 namespace App\Service;
 
+use App\Entity\MessageAgent;
 use App\Entity\Notification;
+use App\Entity\Procedure;
 use App\Entity\RendezVous;
 use App\Entity\Utilisateur;
 use App\Repository\UtilisateurRepository;
@@ -13,7 +15,8 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
 /**
- * Notifications : une ligne en base (canal "app", lue / non lue) + un e-mail.
+ * Notifications : une ligne en base (canal "app", lue / non lue) + un e-mail, ou un SMS simulé
+ * si le destinataire a choisi le canal « sms » et renseigné son téléphone (EF-33).
  * L'envoi d'e-mail ne doit jamais faire échouer l'action métier : en cas
  * d'erreur elle est seulement écrite dans le log.
  *
@@ -30,6 +33,7 @@ class NotificationService
         private MailerInterface $mailer,
         private UtilisateurRepository $utilisateurRepository,
         private LoggerInterface $logger,
+        private SmsSimulateur $sms,
         #[Autowire(env: 'MAILER_FROM')]
         private string $expediteur,
     ) {
@@ -46,9 +50,85 @@ class NotificationService
         $notification->setUtilisateur($destinataire);
         $this->em->persist($notification);
 
-        $this->envoyerEmail($destinataire, $sujet, $message);
+        if ($this->sms->veutUnSms($destinataire)) {
+            $this->sms->envoyer($destinataire, 'Orient-Admin : ' . $message);
+        } else {
+            $this->envoyerEmail($destinataire, $sujet, $message);
+        }
 
         return $notification;
+    }
+
+    /** Rappel de la veille (EF-31) : envoyé par la commande app:rappels-rdv pour un rendez-vous confirmé. */
+    public function rappelRendezVous(RendezVous $rdv): void
+    {
+        $citoyen = $rdv->getDemande()?->getUtilisateur();
+        if (!$citoyen || !$rdv->getCreneau()) {
+            return;
+        }
+        [$quand, $ou] = $this->descriptionRdv($rdv);
+        $this->notifier($citoyen, 'rdv_rappel', 'Rappel de rendez-vous',
+            "Rappel : vous avez rendez-vous $quand ($ou)." . $this->piecesAApporter($rdv));
+    }
+
+    /**
+     * Alerte « pièces manquantes » (EF-32) : l'agent signale au citoyen ce qu'il doit encore fournir.
+     *
+     * @param list<string> $pieces
+     */
+    public function piecesManquantes(RendezVous $rdv, array $pieces, ?string $message = null): void
+    {
+        $citoyen = $rdv->getDemande()?->getUtilisateur();
+        if (!$citoyen || !$rdv->getCreneau()) {
+            return;
+        }
+        [$quand, $ou] = $this->descriptionRdv($rdv);
+        $this->notifier($citoyen, 'pieces_manquantes', 'Pièces manquantes pour votre rendez-vous',
+            "Pour votre rendez-vous $quand ($ou), il manque : " . implode(' ; ', $pieces) . '.'
+            . ($message ? " $message" : '') . ' Merci de les apporter.');
+    }
+
+    /** Alerte « changement de procédure » (EF-32) : prévient le citoyen dont le rendez-vous concerne la procédure modifiée. */
+    public function procedureModifiee(RendezVous $rdv, Procedure $procedure, string $resume): void
+    {
+        $citoyen = $rdv->getDemande()?->getUtilisateur();
+        if (!$citoyen || !$rdv->getCreneau()) {
+            return;
+        }
+        [$quand] = $this->descriptionRdv($rdv);
+        $texte = $procedure->isActif()
+            ? "La procédure « {$procedure->getNom()} » a changé ($resume). Vérifiez avant votre rendez-vous $quand."
+              . $this->piecesAApporter($rdv)
+            : "La procédure « {$procedure->getNom()} » n'est plus proposée. Contactez le service avant votre rendez-vous $quand.";
+        $this->notifier($citoyen, 'procedure_modifiee', 'Une procédure de votre rendez-vous a changé', $texte);
+    }
+
+    /** Message d'un agent à un citoyen (page « communication »). */
+    public function messageAgent(MessageAgent $message): void
+    {
+        $demande = $message->getDemande();
+        $citoyen = $demande?->getUtilisateur();
+        if (!$citoyen) {
+            return;
+        }
+        $service = $demande->getServiceFinal() ?? $demande->getServiceRecommande();
+        $origine = $service ? 'du service ' . $service->getNom() : 'd\'un agent';
+        $this->notifier($citoyen, 'message_agent', $message->getSujet() ?: 'Message de votre service',
+            "Message $origine : " . $message->getTexte());
+    }
+
+    /** @return array{0: string, 1: string} « du 12/11/2026 à 09:00 » et « Service, adresse » */
+    private function descriptionRdv(RendezVous $rdv): array
+    {
+        $creneau = $rdv->getCreneau();
+        $service = $creneau?->getService();
+        $lieu = $service?->getNom() ?? 'le service';
+        $adresse = $service?->getAdresse();
+
+        return [
+            sprintf('du %s à %s', $creneau?->getDate()?->format('d/m/Y'), $creneau?->getHeure()),
+            $adresse ? "$lieu, $adresse" : $lieu,
+        ];
     }
 
     /**

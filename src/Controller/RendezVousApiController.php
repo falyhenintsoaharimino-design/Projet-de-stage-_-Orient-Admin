@@ -210,6 +210,44 @@ class RendezVousApiController extends AbstractController
         return $this->json($this->toArray($rdv));
     }
 
+    /**
+     * Alerte « pièces manquantes » (EF-32) : { "pieces": ["Photo d'identité", "Livret de famille"], "message": "..." }.
+     * Le citoyen reçoit une notification (et un e-mail ou SMS selon son canal) avec la liste de ce qu'il doit encore apporter.
+     */
+    #[Route('/{id}/pieces-manquantes', name: 'api_rdv_pieces_manquantes', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[IsGranted('ROLE_AGENT')]
+    public function piecesManquantes(int $id, Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
+    {
+        $rdv = $this->rendezVousRepository->find($id);
+        if (!$rdv) {
+            return $this->json(['error' => 'Rendez-vous non trouvé'], 404);
+        }
+        if (!$this->peutAcceder($rdv, $utilisateur, false)) {
+            return $this->json(['error' => 'Accès refusé'], 403);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $pieces = is_array($data) ? ($data['pieces'] ?? null) : null;
+        if (!is_array($pieces) || !array_is_list($pieces) || $pieces === [] || count($pieces) > 20
+            || array_filter($pieces, fn($p) => !is_string($p) || trim($p) === '' || strlen($p) > 150) !== []) {
+            return $this->json(['error' => 'pieces doit être une liste de 1 à 20 textes (150 caractères au plus)'], 400);
+        }
+        $message = $data['message'] ?? null;
+        if ($message !== null && (!is_string($message) || strlen($message) > 500)) {
+            return $this->json(['error' => 'message doit être un texte de 500 caractères au plus'], 400);
+        }
+        if (!in_array($rdv->getStatut(), ['en_attente', 'confirme'], true)) {
+            return $this->json(['error' => 'Ce rendez-vous n\'est plus actif'], 409);
+        }
+
+        $pieces = array_map('trim', $pieces);
+        $this->notifications->piecesManquantes($rdv, $pieces, $message !== null && trim($message) !== '' ? trim($message) : null);
+        $this->em->flush();
+        $this->journal->enregistrer('rdv_pieces_manquantes', $utilisateur, sprintf('rdv=%d pieces=%d', $rdv->getId(), count($pieces)));
+
+        return $this->json(['prevenu' => true, 'pieces' => $pieces]);
+    }
+
     #[Route('/{id}/annuler', name: 'api_rdv_annuler', methods: ['PATCH'], requirements: ['id' => '\d+'])]
     public function annuler(int $id, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {

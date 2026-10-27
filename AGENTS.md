@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 26/10/2026, étape 8)
+### Avancement (mis à jour le 27/10/2026, étape 9)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -167,6 +167,28 @@ Fait, testé et poussé :
     Non fait (volontairement) : blocage d'une journée entière en une seule requête (se fait créneau par créneau), jours fériés globaux (étape 10, paramètres),
     motif libre propre au rendez-vous (le texte de la demande en tient lieu).
 
+- Étape 9 Notifications (migration `Version20261027120000`, aucune dépendance Composer) : vérifiée avant livraison : migration jouée, PHPUnit 266 tests OK,
+  `smoke-notifications.sh` 59 OK (rejouable), recettes `smoke-rendez-vous`, `smoke-avis`, `smoke-journal`, `smoke-comptes` toujours vertes.
+  - SMS simulé (EF-33) : `App\Service\SmsSimulateur`, aucun SMS réel. Un citoyen qui a choisi `canalNotification = sms` (téléphone obligatoire, vérifié à l'étape 6)
+    reçoit un SMS simulé à la place de l'e-mail ; la notification de l'application est toujours créée. Le SMS est enregistré comme notification de canal `sms`
+    (statut `envoye`, 320 caractères au plus, préfixe « Orient-Admin : ») : il n'apparaît pas dans le centre de notifications. `GET /api/sms-simules`
+    (admin, `limite`) liste la boîte d'envoi. Une vraie passerelle remplacerait seulement `SmsSimulateur`.
+  - Rappel de la veille (EF-31) : commande `php bin/console app:rappels-rdv` (options `--jours=1`, `--date=AAAA-MM-JJ`, `--dry-run`). Elle prévient les citoyens
+    dont le rendez-vous CONFIRMÉ a lieu demain (jour calculé dans le fuseau `APP_TIMEZONE`). Une seule fois par rendez-vous (`RendezVous::rappelEnvoyeLe`), donc
+    sans danger si elle est lancée plusieurs fois ; un rendez-vous modifié ou reporté sera rappelé de nouveau. Journal `rappels_envoyes`. À PLANIFIER : cron
+    (`0 8 * * * cd /chemin/du/projet && php bin/console app:rappels-rdv`) ou planificateur de tâches Windows (programme `php`, arguments `bin/console app:rappels-rdv`).
+  - Alertes (EF-32) : `POST /api/rendez-vous/{id}/pieces-manquantes` (agent de ce service, admin ; `pieces` 1 à 20 textes, `message` facultatif ; 409 si le rendez-vous
+    n'est plus actif ; journal `rdv_pieces_manquantes`). Changement de procédure : quand une procédure change vraiment (autre chose que `source` ou le libellé de version),
+    est désactivée, les citoyens qui ont un rendez-vous à venir (en attente ou confirmé) choisi avec cette procédure (`procedureId`) sont prévenus, avec les pièces à
+    apporter ; pas d'alerte pour une réactivation. Types de notification : `rdv_rappel`, `pieces_manquantes`, `procedure_modifiee`, `message_agent`.
+  - Messages de l'agent (page « communication ») : entité `MessageAgent`. `POST /api/demandes/{id}/messages` (agent du service de la demande, admin ; `message` 1 à
+    2000 caractères, `sujet` facultatif) ; `GET /api/demandes/{id}/messages` (citoyen auteur, agent du service, responsable, admin), du plus ancien au plus récent.
+    Le citoyen reçoit chaque message comme notification (application + e-mail ou SMS). Journal `message_agent_envoye`.
+  - Tests : `NotificationsTest` (rappels via CommandTester, SMS, pièces manquantes, alerte de procédure, messages), lignes ajoutées à `AccesParRoleTest`, utilitaires partagés
+    dans `OutilsRendezVousTrait` ; OpenAPI à 72 opérations.
+    Non fait (volontairement) : vraie passerelle SMS, notifications push (EF-35, priorité C), alerte « pièces manquantes » liée à une demande sans rendez-vous, modèles de messages
+    modifiables (étape 10, paramètres).
+
 Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est PAS lu en environnement test) avec `DATABASE_URL`
 (même valeur que `.env.local`, le nom de base reçoit tout seul le suffixe `_test`) et `JWT_PASSPHRASE`. Puis, une fois :
 `php bin/console doctrine:database:create --env=test --if-not-exists`, `php bin/console doctrine:migrations:migrate --env=test --no-interaction` ;
@@ -188,7 +210,7 @@ PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de
 8. FAIT (voir Avancement) : rendez-vous. Cahier : créneaux avec durée, capacité et jours fermés, génération en lot (EF-23) ; modification d'un rendez-vous par le
    citoyen et délai limite d'annulation (EF-26) ; report par l'agent (EF-27) ; récapitulatif de confirmation avec lieu et pièces
    à apporter (EF-28).
-9. Notifications : rappel automatique la veille (commande `app:rappels-rdv` à planifier, EF-31) ; alerte pièces manquantes ou
+9. FAIT (voir Avancement) : notifications. Cahier : rappel automatique la veille (commande `app:rappels-rdv` à planifier, EF-31) ; alerte pièces manquantes ou
    changement de procédure (EF-32) ; SMS via un simulateur (EF-33) ; messages de l'agent vers le citoyen (page « communication »).
 10. Administration et recette finale du backend : paramètres (modèles de messages, jours fériés, durée par défaut, EF-46) ;
    sauvegarde et restauration (EF-47, ENF-15) ; métriques du moteur comparées aux cibles 80 % (1re proposition) et 95 % (top 3),

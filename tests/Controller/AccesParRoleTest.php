@@ -88,6 +88,11 @@ class AccesParRoleTest extends WebTestCase
             ['GET', "/api/rendez-vous/$id/recapitulatif", '', self::TOUS, 404],
             ['PATCH', "/api/rendez-vous/$id/reporter", '{}', self::AGENT, 404],
             ['POST', '/api/creneaux/generer', '{}', self::AGENT, 400],
+            // Notifications (étape 9) : messages de l'agent, pièces manquantes, boîte d'envoi des SMS simulés.
+            ['GET', "/api/demandes/$id/messages", '', self::TOUS, 404],
+            ['POST', "/api/demandes/$id/messages", '{}', self::AGENT, 404],
+            ['POST', "/api/rendez-vous/$id/pieces-manquantes", '{}', self::AGENT, 404],
+            ['GET', '/api/sms-simules', '', self::ADMIN, 200],
             ['POST', "/api/procedures/$id/verification", '', self::AGENT, 404],
             // Suppression logique d'un service (identifiant inconnu : rien n'est désactivé)
             ['DELETE', "/api/services/$id", '', self::ADMIN, 404],
