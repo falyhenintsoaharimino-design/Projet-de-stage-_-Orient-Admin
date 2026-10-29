@@ -29,3 +29,5 @@
 /moteur/tests/__pycache__/
 /moteur/.pytest_cache/
 ###< moteur (Python) ###
+etape-10a.patch
+etape-10b.patch

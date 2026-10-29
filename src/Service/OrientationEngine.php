@@ -33,6 +33,9 @@ class OrientationEngine
      *  une précision que d'orienter au hasard (voir EF-16 du cahier des charges). */
     private const SEUIL_CONFIANCE = 0.25;
 
+    /** Longueur maximale (caractères) du texte d'une demande, pour l'assistant comme pour le dépôt d'une demande. */
+    public const TEXTE_MAX = 2000;
+
     public function __construct(
         private readonly ServiceRepository $serviceRepository,
         private readonly MoteurClient $moteur,

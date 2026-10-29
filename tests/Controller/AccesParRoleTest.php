@@ -93,6 +93,12 @@ class AccesParRoleTest extends WebTestCase
             ['POST', "/api/demandes/$id/messages", '{}', self::AGENT, 404],
             ['POST', "/api/rendez-vous/$id/pieces-manquantes", '{}', self::AGENT, 404],
             ['GET', '/api/sms-simules', '', self::ADMIN, 200],
+            // Paramètres et sauvegardes (étape 10a) ; POST /api/admin/sauvegardes est couvert par SauvegardeTest (il lance pg_dump)
+            ['GET', '/api/admin/parametres', '', self::ADMIN, 200],
+            ['PUT', '/api/admin/parametres', '{}', self::ADMIN, 400],
+            ['GET', '/api/jours-feries', '', self::AGENT, 200],
+            ['GET', '/api/admin/sauvegardes', '', self::ADMIN, 200],
+            ['GET', '/api/admin/sauvegardes/orient-admin-20200101-000000.dump', '', self::ADMIN, 404],
             ['POST', "/api/procedures/$id/verification", '', self::AGENT, 404],
             // Suppression logique d'un service (identifiant inconnu : rien n'est désactivé)
             ['DELETE', "/api/services/$id", '', self::ADMIN, 404],

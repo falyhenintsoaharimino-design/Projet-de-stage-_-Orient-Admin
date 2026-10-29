@@ -45,11 +45,14 @@ class DemandeApiController extends AbstractController
     #[Route('', name: 'api_demandes_create', methods: ['POST'])]
     public function create(Request $request, #[CurrentUser] Utilisateur $utilisateur): JsonResponse
     {
-        $data = json_decode($request->getContent(), true) ?? [];
-        $texte = trim($data['texte'] ?? '');
+        $data = json_decode($request->getContent(), true);
+        $texte = is_array($data) && is_string($data['texte'] ?? null) ? trim($data['texte']) : '';
 
         if ($texte === '') {
             return $this->json(['error' => 'Le texte de la demande est requis'], 400);
+        }
+        if (mb_strlen($texte) > OrientationEngine::TEXTE_MAX) {
+            return $this->json(['error' => 'Le texte de la demande est limité à ' . OrientationEngine::TEXTE_MAX . ' caractères'], 400);
         }
 
         // Le citoyen peut choisir lui-même le service (ex. depuis une fiche

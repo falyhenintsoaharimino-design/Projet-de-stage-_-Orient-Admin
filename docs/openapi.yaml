@@ -298,6 +298,8 @@ paths:
               properties:
                 texte:
                   type: string
+                  maxLength: 2000
+                  description: 'Texte libre, 2000 caractères au plus (400 au-delà ou si ce n''est pas une chaîne).'
               required:
               - texte
       security: []
@@ -378,6 +380,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Service'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
         '403':
@@ -690,6 +694,8 @@ paths:
               properties:
                 texte:
                   type: string
+                  maxLength: 2000
+                  description: 'Texte libre, 2000 caractères au plus (400 au-delà ou si ce n''est pas une chaîne).'
                 serviceId:
                   type: integer
                   description: 'Optionnel : service choisi par le citoyen'
@@ -747,6 +753,8 @@ paths:
                 $ref: '#/components/schemas/Demande'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
   /api/demandes/{id}/reorienter:
@@ -1140,6 +1148,8 @@ paths:
           $ref: '#/components/responses/NonAuthentifie'
         '400':
           $ref: '#/components/responses/RequeteInvalide'
+        '403':
+          $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
         '409':
@@ -1181,6 +1191,8 @@ paths:
                 $ref: '#/components/schemas/RendezVous'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
     patch:
@@ -1432,6 +1444,8 @@ paths:
                 $ref: '#/components/schemas/RendezVous'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
         '409':
@@ -1611,6 +1625,8 @@ paths:
                 $ref: '#/components/schemas/Avis'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
   /api/demandes/{id}/messages:
@@ -1813,6 +1829,8 @@ paths:
                 $ref: '#/components/schemas/Notification'
         '401':
           $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
         '404':
           $ref: '#/components/responses/Introuvable'
   /api/statistiques/tableau-de-bord:
@@ -2607,6 +2625,208 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Erreur'
+  /api/admin/parametres:
+    get:
+      tags:
+      - Administration
+      summary: Lit les paramètres de l'application
+      description: 'Durée par défaut des créneaux, jours fériés et modèles de messages avec leurs variables (EF-46). Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Paramètres courants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parametres'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+    put:
+      tags:
+      - Administration
+      summary: Modifie les paramètres (partiel)
+      description: 'Seules les clés envoyées changent ; tout est validé avant la moindre écriture. `joursFeries` remplace la liste entière ;
+        `modelesMessages` est fusionné type par type (`null` = retour au modèle par défaut). Les jours fériés sont exclus de
+        `POST /api/creneaux/generer`. La durée par défaut s''applique aux nouveaux services. Journal : `parametres_modifies`.
+        Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dureeCreneauDefautMinutes:
+                  type: integer
+                  minimum: 5
+                  maximum: 240
+                joursFeries:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required:
+                    - date
+                    - libelle
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      libelle:
+                        type: string
+                        maxLength: 100
+                modelesMessages:
+                  type: object
+                  description: 'Clés : rdv_en_attente, rdv_confirme, rdv_modifie, rdv_reporte, rdv_refuse, rdv_termine, rdv_rappel, pieces_manquantes.'
+                  additionalProperties:
+                    type: object
+                    nullable: true
+                    properties:
+                      sujet:
+                        type: string
+                        maxLength: 150
+                      message:
+                        type: string
+                        maxLength: 1000
+      responses:
+        '200':
+          description: Paramètres après modification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parametres'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/jours-feries:
+    get:
+      tags:
+      - Créneaux
+      summary: Liste les jours fériés
+      description: 'Jours fériés du paramétrage, triés par date, pour préparer les créneaux. Rôles autorisés : agent, admin.'
+      parameters:
+      - name: du
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: au
+        in: query
+        schema:
+          type: string
+          format: date
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Jours fériés
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    libelle:
+                      type: string
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+  /api/admin/sauvegardes:
+    get:
+      tags:
+      - Administration
+      summary: Liste les sauvegardes de la base
+      description: 'De la plus récente à la plus ancienne (EF-47). Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Sauvegardes disponibles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sauvegarde'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+    post:
+      tags:
+      - Administration
+      summary: Crée une sauvegarde immédiate (pg_dump)
+      description: 'La sauvegarde quotidienne est faite par `php bin/console app:sauvegarde` (à planifier). La restauration n''est pas dans
+        l''API : `php bin/console app:restauration` sur le serveur. 503 si pg_dump est introuvable. Journal : `sauvegarde_creee`.
+        Rôles autorisés : admin.'
+      security:
+      - bearerAuth: []
+      responses:
+        '201':
+          description: Sauvegarde créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sauvegarde'
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '503':
+          description: pg_dump introuvable ou en échec
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
+  /api/admin/sauvegardes/{nom}:
+    get:
+      tags:
+      - Administration
+      summary: Télécharge une sauvegarde
+      description: 'Le fichier contient toutes les données personnelles : le téléchargement est journalisé (`sauvegarde_telechargee`).
+        Rôles autorisés : admin.'
+      parameters:
+      - name: nom
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^orient-admin-\d{8}-\d{6}\.dump$
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Fichier pg_dump (format personnalisé)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NonAuthentifie'
+        '403':
+          $ref: '#/components/responses/Interdit'
+        '404':
+          description: Sauvegarde non trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erreur'
 components:
   securitySchemes:
     bearerAuth:
@@ -2648,6 +2868,54 @@ components:
           schema:
             $ref: '#/components/schemas/Erreur'
   schemas:
+    Sauvegarde:
+      type: object
+      properties:
+        nom:
+          type: string
+        taille:
+          type: integer
+          description: Octets
+        date:
+          type: string
+          format: date-time
+    Parametres:
+      type: object
+      properties:
+        dureeCreneauDefautMinutes:
+          type: integer
+        joursFeries:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              libelle:
+                type: string
+        modelesMessages:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              sujet:
+                type: string
+              message:
+                type: string
+              personnalise:
+                type: boolean
+              variables:
+                type: array
+                items:
+                  type: string
+              defaut:
+                type: object
+                properties:
+                  sujet:
+                    type: string
+                  message:
+                    type: string
     Erreur:
       type: object
       properties:

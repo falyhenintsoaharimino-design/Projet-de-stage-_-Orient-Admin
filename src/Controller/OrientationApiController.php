@@ -29,11 +29,14 @@ class OrientationApiController extends AbstractController
     #[Route('/tester', name: 'api_orientation_tester', methods: ['POST'])]
     public function tester(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true) ?? [];
-        $texte = trim($data['texte'] ?? '');
+        $data = json_decode($request->getContent(), true);
+        $texte = is_array($data) && is_string($data['texte'] ?? null) ? trim($data['texte']) : '';
 
         if ($texte === '') {
             return $this->json(['error' => 'Le texte de la demande est requis'], 400);
+        }
+        if (mb_strlen($texte) > OrientationEngine::TEXTE_MAX) {
+            return $this->json(['error' => 'Le texte de la demande est limité à ' . OrientationEngine::TEXTE_MAX . ' caractères'], 400);
         }
 
         $resultat = $this->orientationEngine->orienter($texte);

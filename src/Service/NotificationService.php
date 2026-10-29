@@ -34,6 +34,7 @@ class NotificationService
         private UtilisateurRepository $utilisateurRepository,
         private LoggerInterface $logger,
         private SmsSimulateur $sms,
+        private ParametreService $parametres,
         #[Autowire(env: 'MAILER_FROM')]
         private string $expediteur,
     ) {
@@ -66,9 +67,7 @@ class NotificationService
         if (!$citoyen || !$rdv->getCreneau()) {
             return;
         }
-        [$quand, $ou] = $this->descriptionRdv($rdv);
-        $this->notifier($citoyen, 'rdv_rappel', 'Rappel de rendez-vous',
-            "Rappel : vous avez rendez-vous $quand ($ou)." . $this->piecesAApporter($rdv));
+        $this->notifierModele($citoyen, 'rdv_rappel', $this->variablesRdv($rdv));
     }
 
     /**
@@ -82,10 +81,10 @@ class NotificationService
         if (!$citoyen || !$rdv->getCreneau()) {
             return;
         }
-        [$quand, $ou] = $this->descriptionRdv($rdv);
-        $this->notifier($citoyen, 'pieces_manquantes', 'Pièces manquantes pour votre rendez-vous',
-            "Pour votre rendez-vous $quand ($ou), il manque : " . implode(' ; ', $pieces) . '.'
-            . ($message ? " $message" : '') . ' Merci de les apporter.');
+        $this->notifierModele($citoyen, 'pieces_manquantes', [
+            'liste' => implode(' ; ', $pieces),
+            'message' => $message ? " $message" : '',
+        ] + $this->variablesRdv($rdv));
     }
 
     /** Alerte « changement de procédure » (EF-32) : prévient le citoyen dont le rendez-vous concerne la procédure modifiée. */
@@ -115,6 +114,30 @@ class NotificationService
         $origine = $service ? 'du service ' . $service->getNom() : 'd\'un agent';
         $this->notifier($citoyen, 'message_agent', $message->getSujet() ?: 'Message de votre service',
             "Message $origine : " . $message->getTexte());
+    }
+
+    /**
+     * Notification au citoyen d'après le modèle de message (personnalisé par l'admin, EF-46, ou par défaut).
+     *
+     * @param array<string, string> $variables
+     */
+    private function notifierModele(Utilisateur $destinataire, string $type, array $variables): void
+    {
+        [$sujet, $message] = $this->parametres->rendre($type, $variables);
+        $this->notifier($destinataire, $type, $sujet, $message);
+    }
+
+    /** @return array<string, string> variables {quand}, {lieu}, {service}, {pieces} d'un rendez-vous */
+    private function variablesRdv(RendezVous $rdv): array
+    {
+        [$quand, $ou] = $this->descriptionRdv($rdv);
+
+        return [
+            'quand' => $quand,
+            'lieu' => $ou,
+            'service' => $rdv->getCreneau()?->getService()?->getNom() ?? 'le service',
+            'pieces' => $this->piecesAApporter($rdv),
+        ];
     }
 
     /** @return array{0: string, 1: string} « du 12/11/2026 à 09:00 » et « Service, adresse » */
@@ -153,11 +176,11 @@ class NotificationService
         $ou = $adresse ? "$lieu, $adresse" : $lieu;
         $agents = $service ? $this->utilisateurRepository->findAgentsDuService($service) : [];
         $nomCitoyen = trim($citoyen->getPrenom() . ' ' . $citoyen->getNom());
+        $variables = ['quand' => $quand, 'lieu' => $ou, 'service' => $lieu, 'pieces' => $this->piecesAApporter($rdv)];
 
         switch ($evenement) {
             case 'reserve':
-                $this->notifier($citoyen, 'rdv_en_attente', 'Demande de rendez-vous enregistrée',
-                    "Votre demande de rendez-vous $quand ($ou) est enregistrée. Un agent doit la confirmer." . $this->piecesAApporter($rdv));
+                $this->notifierModele($citoyen, 'rdv_en_attente', $variables);
                 foreach ($agents as $agent) {
                     $this->notifier($agent, 'rdv_a_valider', 'Nouveau rendez-vous à valider',
                         "$nomCitoyen demande un rendez-vous $quand. À confirmer ou refuser.");
@@ -165,13 +188,11 @@ class NotificationService
                 break;
 
             case 'confirme':
-                $this->notifier($citoyen, 'rdv_confirme', 'Rendez-vous confirmé',
-                    "Votre rendez-vous $quand est confirmé. Lieu : $ou." . $this->piecesAApporter($rdv));
+                $this->notifierModele($citoyen, 'rdv_confirme', $variables);
                 break;
 
             case 'modifie':
-                $this->notifier($citoyen, 'rdv_modifie', 'Rendez-vous modifié',
-                    "Votre rendez-vous est maintenant fixé $quand ($ou). Un agent doit le confirmer de nouveau." . $this->piecesAApporter($rdv));
+                $this->notifierModele($citoyen, 'rdv_modifie', $variables);
                 foreach ($agents as $agent) {
                     $this->notifier($agent, 'rdv_a_valider', 'Rendez-vous modifié à valider',
                         "$nomCitoyen a déplacé son rendez-vous $quand. À confirmer ou refuser.");
@@ -179,19 +200,18 @@ class NotificationService
                 break;
 
             case 'reporte':
-                $motif = !empty($contexte['motif']) ? ' Motif : ' . $contexte['motif'] . '.' : '';
-                $this->notifier($citoyen, 'rdv_reporte', 'Rendez-vous reporté',
-                    "Votre rendez-vous " . ($contexte['ancien'] ?? '') . " est reporté : il a lieu $quand ($ou).$motif" . $this->piecesAApporter($rdv));
+                $this->notifierModele($citoyen, 'rdv_reporte', [
+                    'ancien' => (string) ($contexte['ancien'] ?? ''),
+                    'motif' => !empty($contexte['motif']) ? ' Motif : ' . $contexte['motif'] . '.' : '',
+                ] + $variables);
                 break;
 
             case 'refuse':
-                $this->notifier($citoyen, 'rdv_refuse', 'Rendez-vous refusé',
-                    "Votre rendez-vous $quand ($lieu) a été refusé. Vous pouvez choisir un autre créneau.");
+                $this->notifierModele($citoyen, 'rdv_refuse', $variables);
                 break;
 
             case 'termine':
-                $this->notifier($citoyen, 'rdv_termine', 'Votre rendez-vous est terminé',
-                    "Votre rendez-vous $quand ($lieu) est terminé. Donnez votre avis pour nous aider à améliorer le service.");
+                $this->notifierModele($citoyen, 'rdv_termine', $variables);
                 break;
 
             case 'annule':

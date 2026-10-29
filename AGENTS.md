@@ -43,7 +43,7 @@ fonctionnelle ; ne pas les relire en entier à chaque fois.
 - Comptes de test (mot de passe `motdepasse123`) : test@test.com (citoyen),
   agent@test.com (service 1), admin@test.com, responsable@test.com.
 
-### Avancement (mis à jour le 27/10/2026, étape 9)
+### Avancement (mis à jour le 28/10/2026, étape 10b : BACKEND GELÉ)
 
 Fait, testé et poussé :
 - 13 entités, rôles, auth JWT, services/procédures, demandes, orientation par mots-clés
@@ -189,6 +189,49 @@ Fait, testé et poussé :
     Non fait (volontairement) : vraie passerelle SMS, notifications push (EF-35, priorité C), alerte « pièces manquantes » liée à une demande sans rendez-vous, modèles de messages
     modifiables (étape 10, paramètres).
 
+- Étape 10a Paramètres + sauvegarde/restauration (migration `Version20261028120000`, aucune dépendance Composer) : vérifiée avant livraison : migration jouée,
+  PHPUnit 302 tests OK, `smoke-parametres.sh` 71 OK (rejouable), recettes `smoke-notifications`, `smoke-rendez-vous`, `smoke-catalogue`, `smoke-journal` toujours vertes.
+  - Paramètres (EF-46) : entité `Parametre` (clé / valeur JSON), `App\Service\ParametreService`. `GET` et `PUT /api/admin/parametres` (admin ; `PUT` partiel, tout est validé
+    avant d'écrire ; journal `parametres_modifies`) : `dureeCreneauDefautMinutes` (5 à 240, 30 par défaut) = durée d'un NOUVEAU service créé sans `dureeCreneauMinutes`
+    (les services existants gardent leur réglage) ; `joursFeries` (liste complète de `{date, libelle}`, 100 au plus) exclus de `POST /api/creneaux/generer`
+    (réponse : `joursFeriesExclus`) ; `modelesMessages` : sujet + texte des 8 notifications adressées au citoyen (`rdv_en_attente`, `rdv_confirme`, `rdv_modifie`,
+    `rdv_reporte`, `rdv_refuse`, `rdv_termine`, `rdv_rappel`, `pieces_manquantes`), avec variables `{quand}`, `{lieu}`, `{service}`, `{pieces}`, `{ancien}`, `{motif}`,
+    `{liste}`, `{message}` selon le type (variable inconnue = 400) ; `null` = retour au texte par défaut (les défauts sont dans `ParametreService::MODELES`, identiques aux
+    anciens textes). `GET /api/jours-feries` (agent, admin ; `du`, `au`). Non fait : jours fériés hors génération (un créneau créé à la main un jour férié reste possible),
+    modèles pour les notifications destinées aux agents, `rdv_annule`, `procedure_modifiee` et `message_agent`, jours fériés officiels préremplis.
+  - Sauvegarde et restauration (EF-47, ENF-15) : `App\Service\SauvegardeService` (pg_dump / pg_restore, format personnalisé, fichiers `orient-admin-AAAAMMJJ-HHMMSS.dump` dans
+    `SAUVEGARDE_DIR`, par défaut `var/sauvegardes`, hors git ; variables `PG_DUMP_BIN` et `PG_RESTORE_BIN` si les programmes ne sont pas dans le PATH, ex. chemin complet
+    de `pg_dump.exe` sous Windows). Commande `php bin/console app:sauvegarde [--garder=14]` (crée puis ne garde que les N plus récentes ; journal `sauvegarde_creee`)
+    À PLANIFIER chaque jour : cron `0 2 * * * cd /chemin/du/projet && php bin/console app:sauvegarde` ou planificateur de tâches Windows (programme `php`, arguments
+    `bin/console app:sauvegarde`). Commande `php bin/console app:restauration <nom|chemin> [--base=AUTRE_BASE] [--oui]` : avec `--base`, restaure dans une autre base (créée
+    si besoin) et affiche deux lignes « Contrôle » (courante / restaurée) à comparer : c'est la restauration TESTÉE (ENF-15) sans toucher à la base courante ; sans `--base`,
+    remplace la base courante après confirmation (`--oui`), en une seule transaction (échec = rien de modifié), serveur web arrêté. Journal `sauvegarde_restauree`.
+    API admin : `GET` et `POST /api/admin/sauvegardes` (liste, sauvegarde immédiate, 503 si pg_dump introuvable), `GET /api/admin/sauvegardes/{nom}` (téléchargement, journal
+    `sauvegarde_telechargee`). La RESTAURATION n'est volontairement pas dans l'API (elle remplace toutes les données) : ligne de commande seulement. Le mot de passe de la base
+    passe par `PGPASSWORD`, jamais dans la ligne de commande. Non fait : chiffrement des fichiers, copie hors serveur (à prévoir au déploiement, étape 19), sauvegarde des
+    exemples du moteur Python (le dossier `moteur/` n'a pas de base propre).
+  - Tests : `ParametresTest`, `SauvegardeTest` (sautés si pg_dump est absent ; dossier `var/sauvegardes_test`, base temporaire `orient_admin_phpunit_verif` supprimée en fin de test),
+    lignes ajoutées à `AccesParRoleTest` ; OpenAPI à 78 opérations.
+
+- Étape 10b Recette finale du backend (aucune migration, aucune dépendance Composer) : vérifiée avant livraison : PHPUnit toute la suite OK, `doctrine:schema:validate` OK,
+  OpenAPI validé avec `openapi-spec-validator` (78 opérations, aucune référence cassée), `scripts/recette-finale.sh` 102 vérifications OK sur 9 scénarios (rejouable),
+  recettes `smoke-*` toujours vertes.
+  - Défaut trouvé par la recette et corrigé : `POST /api/orientation/tester` (public) et `POST /api/demandes` renvoyaient 500 si `texte` était un tableau ou un objet, et
+    n'avaient aucune longueur maximale. Maintenant : `texte` doit être une chaîne de 1 à `OrientationEngine::TEXTE_MAX` (2000) caractères, sinon 400 ; un corps JSON qui n'est
+    pas un objet donne aussi 400 (`EntreesInvalidesTest`, 23 cas). Un `texte` numérique (ex. 123), accepté autrefois, est maintenant refusé (400).
+  - `scripts/recette-finale.sh [URL]` : scénarios S1 à S9 du cahier avec un verdict par scénario (S1 visiteur et procédure, S2 demande ambiguë ou hors sujet, S3 compte et mot de
+    passe oublié, S4 rendez-vous complet de la réservation au rappel, S5 réorientation, S6 versions d'une procédure, S7 statistiques et export CSV, S8 qualité du moteur,
+    S9 sécurité). Les rendez-vous de test sont annulés ; restent en base des comptes `recette-finale-…`, des demandes, des créneaux et des procédures de test.
+  - `scripts/test-charge.py [--url U --utilisateurs 100 --parcours 5]` (Python standard, sans installation) : ENF-01 et ENF-02. Mesure de référence : 100 utilisateurs
+    simultanés, 1 500 requêtes, 0 erreur, assistant au 95e centile en 1,87 s (machine à 1 cœur, PHP en mode prod avec 16 processus, client sur la même machine). À rejouer sur
+    le serveur de démonstration. Sous Windows, `symfony serve` suffit ; le serveur intégré `php -S` ne traite qu'une requête à la fois (résultats pessimistes).
+  - Moteur : 97,1 % en 1re proposition (cible 80 %), 100 % dans les 3 premières (cible 95 %), 65 % des demandes hors sujet écartées. Jeu de test écrit par l'équipe : chiffres
+    optimistes, à dire tels quels au jury (voir `docs/conformite.md`).
+  - `docs/conformite.md` : tableau des 49 exigences fonctionnelles et 15 non fonctionnelles (état, preuve, reste à faire) : EF 37 faites, 8 partielles, 3 pour le front, 1 non faite
+    (push, priorité C) ; ENF 7 faites, 4 partielles, 3 pour le front, 1 pour le déploiement.
+  - Restes connus du backend (décidés, non bloquants) : mot de passe oublié par SMS (EF-03), alerte pièces manquantes sans rendez-vous (EF-32), export PDF/Excel natif (EF-43),
+    malagasy dans le moteur (EF-13), notifications push (EF-35), vraie passerelle SMS et vrai SMTP (au déploiement), jours fériés hors génération de créneaux (10a).
+
 Tests PHPUnit : créer `.env.test.local` (ignoré par git ; `.env.local` n'est PAS lu en environnement test) avec `DATABASE_URL`
 (même valeur que `.env.local`, le nom de base reçoit tout seul le suffixe `_test`) et `JWT_PASSPHRASE`. Puis, une fois :
 `php bin/console doctrine:database:create --env=test --if-not-exists`, `php bin/console doctrine:migrations:migrate --env=test --no-interaction` ;
@@ -212,11 +255,10 @@ PHASE 1 : compléter le backend (chaque étape : patch, tests PHPUnit, script de
    à apporter (EF-28).
 9. FAIT (voir Avancement) : notifications. Cahier : rappel automatique la veille (commande `app:rappels-rdv` à planifier, EF-31) ; alerte pièces manquantes ou
    changement de procédure (EF-32) ; SMS via un simulateur (EF-33) ; messages de l'agent vers le citoyen (page « communication »).
-10. Administration et recette finale du backend : paramètres (modèles de messages, jours fériés, durée par défaut, EF-46) ;
-   sauvegarde et restauration (EF-47, ENF-15) ; métriques du moteur comparées aux cibles 80 % (1re proposition) et 95 % (top 3),
-   écart expliqué si non atteint ; test de charge : assistant en 3 s ou moins pour 95 % des requêtes (ENF-01), 100 utilisateurs simultanés (ENF-02) ;
-   tableau de conformité EF/ENF ; script de recette des scénarios S1 à S9 ; relecture d'OpenAPI.
-   À la fin : le backend est GELÉ (plus de changement sans raison).
+10. Administration et recette finale du backend, en deux sous-étapes :
+   10a. FAIT (voir Avancement) : paramètres (modèles de messages, jours fériés, durée par défaut, EF-46) ; sauvegarde et restauration (EF-47, ENF-15).
+   10b. FAIT (voir Avancement) : métriques du moteur (cibles atteintes), test de charge, tableau de conformité EF/ENF, recette S1 à S9, relecture d'OpenAPI.
+   LE BACKEND EST GELÉ : plus de changement sans raison (bogue prouvé, besoin découvert pendant la revue du front, ou déploiement).
 
 PHASE 2 : revue du front, une discussion par rôle, sans brancher l'API (revoir chaque page : contenu, ergonomie, accessibilité
 WCAG 2.1 AA, responsive, besoins backend oubliés ; résultat : liste d'améliorations validée par l'étudiant, notée ici)

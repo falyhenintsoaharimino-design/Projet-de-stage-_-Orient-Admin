@@ -11,6 +11,7 @@ use App\Repository\ServiceRepository;
 use App\Service\Fuseau;
 use App\Service\GenerateurCreneaux;
 use App\Service\JournalService;
+use App\Service\ParametreService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,6 +41,7 @@ class CreneauApiController extends AbstractController
         private JournalService $journal,
         private GenerateurCreneaux $generateur,
         private Fuseau $fuseau,
+        private ParametreService $parametres,
     ) {
     }
 
@@ -219,7 +221,9 @@ class CreneauApiController extends AbstractController
             return $this->json(['error' => 'datesFermees doit être une liste de dates AAAA-MM-JJ'], 400);
         }
 
-        $jours = $this->generateur->jours($dateDebut, $dateFin, $joursFermes, $datesFermees);
+        // Jours fériés du paramétrage (EF-46) : jamais de créneaux ces jours-là.
+        $joursFeriesExclus = $this->parametres->datesFeriees($dateDebut, $dateFin);
+        $jours = $this->generateur->jours($dateDebut, $dateFin, $joursFermes, array_merge($datesFermees, $joursFeriesExclus));
         $heures = $this->generateur->horaires($data['heureDebut'], $data['heureFin'], $duree, $pauseDebut, $pauseFin);
         if ($heures === []) {
             return $this->json(['error' => 'Aucun créneau ne tient dans cette plage horaire avec cette durée'], 400);
@@ -267,6 +271,7 @@ class CreneauApiController extends AbstractController
             'dureeMinutes' => $duree,
             'capacite' => $capacite,
             'joursFermes' => $joursFermes,
+            'joursFeriesExclus' => $joursFeriesExclus,
         ], 201);
     }
 

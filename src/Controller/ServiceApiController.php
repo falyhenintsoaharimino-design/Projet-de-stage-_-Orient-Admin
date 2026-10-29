@@ -6,6 +6,7 @@ use App\Entity\Service;
 use App\Entity\Utilisateur;
 use App\Repository\ServiceRepository;
 use App\Service\JournalService;
+use App\Service\ParametreService;
 use App\Service\RechercheService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,6 +25,7 @@ class ServiceApiController extends AbstractController
         private ServiceRepository $serviceRepository,
         private JournalService $journal,
         private RechercheService $recherche,
+        private ParametreService $parametres,
     ) {
     }
 
@@ -100,6 +102,12 @@ class ServiceApiController extends AbstractController
         $service->setContact($data['contact'] ?? null);
         $service->setActif($data['actif'] ?? true);
         $service->setMotsCles($data['motsCles'] ?? null);
+        // Durée des créneaux : celle envoyée, sinon la durée par défaut du paramétrage (EF-46).
+        $duree = $data['dureeCreneauMinutes'] ?? $this->parametres->dureeCreneauDefaut();
+        if (!is_int($duree) || $duree < 5 || $duree > 240) {
+            return $this->json(['error' => 'dureeCreneauMinutes doit être un entier de 5 à 240'], 400);
+        }
+        $service->setDureeCreneauMinutes($duree);
 
         $this->em->persist($service);
         $this->em->flush();
